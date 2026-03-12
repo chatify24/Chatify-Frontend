@@ -35,19 +35,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthenticated(true);
     }
   }, []);
+const login = (email: string, password: string) => {
+  const stored = localStorage.getItem("chat_accounts");
+  const accounts = stored ? JSON.parse(stored) : {};
 
-  const login = (email: string, _password: string) => {
-    const stored = localStorage.getItem("chat_accounts");
-    const accounts = stored ? JSON.parse(stored) : {};
-    if (accounts[email]) {
-      const profile = accounts[email].profile;
-      setUser(profile);
-      setIsAuthenticated(true);
-      localStorage.setItem("chat_user", JSON.stringify(profile));
-      return true;
-    }
-    return false;
-  };
+  if (accounts[email] && accounts[email].password === password) {
+    const profile = accounts[email].profile;
+
+    setUser(profile);
+    setIsAuthenticated(true);
+    localStorage.setItem("chat_user", JSON.stringify(profile));
+
+    return true;
+  }
+
+  return false;
+};
 
   const signup = (email: string, _password: string) => {
     const stored = localStorage.getItem("chat_accounts");
@@ -81,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const isProfileComplete = !!(user?.name && user?.avatar);
+const isProfileComplete = !!user?.name;
 
   return (
     <AuthContext.Provider value={{ user, isAuthenticated, isProfileComplete, login, signup, logout, updateProfile }}>
