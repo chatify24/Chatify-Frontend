@@ -3,8 +3,17 @@ import { useAuth } from "@/lib/auth-context";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { User, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "../supabaseClient";
+
+const getInitials = (name?: string) => {
+  if (!name) return "";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
+};
 
 const Profile = () => {
 const { user, updateProfile, logout } = useAuth();
@@ -14,20 +23,40 @@ const { user, updateProfile, logout } = useAuth();
   const [name, setName] = useState(user?.name || "");
   const [loading, setLoading] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState(user?.avatar || "");
+  const [uploading, setUploading] = useState(false);
 
   const inputRef = useRef(null);
 
-  const handlePhotoChange = (e) => {
+  const handlePhotoChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const imageUrl = URL.createObjectURL(file);
-    setSelectedAvatar(imageUrl);
+    setUploading(true);
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    try {
+      const response = await fetch("http://localhost:5000/upload-profile", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const data = await response.json();
+      setSelectedAvatar(data.imageUrl);
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      toast({ title: "Failed to upload image", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
   };
 
-const handleContinue = () => {
-  if (loading) return;
-
+const handleContinue = async () => {
   if (!name.trim()) {
     toast({ title: "Please enter your name", variant: "destructive" });
     return;
@@ -35,17 +64,37 @@ const handleContinue = () => {
 
   setLoading(true);
 
-  setTimeout(() => {
-    updateProfile({
+ 
+  const { data } = await supabase.auth.getUser();
+  const userId = data.user?.id;
+
+  if (!userId) {
+    toast({ title: "User not found", variant: "destructive" });
+    setLoading(false);
+    return;
+  }
+
+  const delay = new Promise(res => setTimeout(res, 2500));
+
+  const dbProcess = supabase.from("profiles").upsert([
+    {
+      id: userId,
+      email: data.user.email,
       name: name.trim(),
       avatar: selectedAvatar || "",
-    });
-    setName(""); // 👈 input clear
-    navigate("/chat", { replace: true });
-    setLoading(false);
-  }, 3000);
-};
+    },
+  ]);
 
+  await Promise.all([delay, dbProcess]);
+
+  await updateProfile({
+    name: name.trim(),
+    avatar: selectedAvatar || "",
+  });
+
+  navigate("/chat", { replace: true });
+  setLoading(false);
+};
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
       <div className="w-full max-w-md space-y-8">
@@ -72,7 +121,9 @@ const handleContinue = () => {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <User className="h-12 w-12 text-muted-foreground" />
+                  <span className="text-muted-foreground text-2xl font-bold">
+                    {getInitials(name) || "?"}
+                  </span>
                 )}
 
               </div>
@@ -103,8 +154,9 @@ const handleContinue = () => {
               variant="outline"
               className="rounded-xl"
               onClick={() => inputRef.current.click()}
+              disabled={uploading}
             >
-              {selectedAvatar ? "Change Photo" : "Choose Photo"}
+              {uploading ? "Uploading..." : selectedAvatar ? "Change Photo" : "Choose Photo"}
             </Button>
 
           </div>

@@ -6,6 +6,7 @@ export interface Contact {
   time: string;
   unread: number;
   online: boolean;
+  last_seen?: string;
 }
 
 export interface Message {

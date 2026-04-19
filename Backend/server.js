@@ -7,12 +7,14 @@ import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import cloudinary from "cloudinary";
 import multer from "multer";
+import { createClient } from '@supabase/supabase-js';
 dotenv.config();
 cloudinary.v2.config({
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.CLOUD_API_KEY,
   api_secret: process.env.CLOUD_API_SECRET,
-});
+}); 
+const supabaseAdmin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const app = express();
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -55,7 +57,7 @@ return `
 <td style="text-align:center;padding-bottom:20px;">
 
 <img
-src="https://res.cloudinary.com/dpaiyfwdu/image/upload/v1773241177/chattix_bdffhv.png"
+src="https://res.cloudinary.com/dpaiyfwdu/image/upload/v1776595107/chatify_gzok1x.png"
 width="150"
 style="display:block;margin:auto;margin-bottom:10px;"
 alt="Chatify"
@@ -265,7 +267,7 @@ app.post("/upload-profile", upload.single("image"), async (req, res) => {
     res.status(500).json({ error: "Upload failed" });
   }
 });
-app.post("/reset-password", (req, res) => {
+app.post("/reset-password", async (req, res) => {
 
   const { email, password } = req.body;
 
@@ -275,12 +277,42 @@ app.post("/reset-password", (req, res) => {
     });
   }
 
-  // Abhi DB nahi hai, to sirf success return karenge
-  console.log("Password reset request for:", email);
+  try {
+    // Get user ID from profiles table
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("email", email)
+      .single();
 
-  res.json({
-    success: true
-  });
+    if (profileError || !profile) {
+      return res.status(400).json({
+        error: "User not found"
+      });
+    }
+
+    // Update password using Supabase admin
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(profile.id, {
+      password: password
+    });
+
+    if (updateError) {
+      console.log("Password update error:", updateError);
+      return res.status(500).json({
+        error: "Failed to update password"
+      });
+    }
+
+    res.json({
+      success: true
+    });
+
+  } catch (err) {
+    console.log("Reset password error:", err);
+    res.status(500).json({
+      error: "Server error"
+    });
+  }
 
 });
 app.listen(5000, () => {

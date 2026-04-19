@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { supabase } from "../supabaseClient";
+import { generateUID } from "@/utils/uid";
 
 export interface UserProfile {
   name: string;
@@ -6,12 +8,14 @@ export interface UserProfile {
   avatar: string;
 }
 
+type AuthResult = { success: true; profileComplete: boolean } | string;
+
 interface AuthContextType {
   user: UserProfile | null;
   isAuthenticated: boolean;
   isProfileComplete: boolean;
-  login: (email: string, password: string) => boolean;
-  signup: (email: string, password: string) => boolean;
+  login: (email: string, password: string) => Promise<AuthResult>;
+  signup: (email: string, password: string) => Promise<AuthResult>;
   logout: () => void;
   updateProfile: (profile: Partial<UserProfile>) => void;
 }
@@ -28,66 +32,215 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("chat_user");
-    if (stored) {
-      setUser(JSON.parse(stored));
+  // 🔁 AUTO LOGIN
+// 🔁 AUTO LOGIN + ONLINE SET
+useEffect(() => {
+  const getSession = async () => {
+    const { data } = await supabase.auth.getSession();
+    if (data.session?.user) {
+      const userId = data.session.user.id;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      // 🟢 ONLINE SET
+      await supabase
+        .from("profiles")
+        .update({ last_seen: new Date().toISOString() })
+        .eq("id", userId);
+
+      setUser({
+        name: profile?.name || "",
+        email: data.session.user.email!,
+        avatar: profile?.avatar || "",
+      });
+
       setIsAuthenticated(true);
     }
-  }, []);
-const login = (email: string, password: string) => {
-  const stored = localStorage.getItem("chat_accounts");
-  const accounts = stored ? JSON.parse(stored) : {};
+  };
 
-  if (accounts[email] && accounts[email].password === password) {
-    const profile = accounts[email].profile;
+  getSession();
+}, []);
+useEffect(() => {
+  const interval = setInterval(async () => {
+    const { data } = await supabase.auth.getUser();
+    const userId = data.user?.id;
 
-    setUser(profile);
-    setIsAuthenticated(true);
-    localStorage.setItem("chat_user", JSON.stringify(profile));
+    if (userId) {
+      await supabase
+        .from("profiles")
+        .update({ last_seen: new Date().toISOString() })
+        .eq("id", userId);
+    }
+  }, 2000);
 
-    return true;
+  return () => clearInterval(interval);
+}, []);
+
+
+  // 🔐 SIGNUP
+const signup = async (email: string, password: string): Promise<AuthResult> => {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+  });
+
+  if (error) {
+    if (error.message.toLowerCase().includes("already")) {
+      return "Account already exists";
+    }
+    return error.message;
   }
 
-  return false;
+  const user = data.user;
+
+  if (!user) {
+    return "Signup failed (no user)";
+  }
+
+  const uid = generateUID(user.email);
+
+  const { error: insertError } = await supabase.from("profiles").insert([
+    {
+      id: user.id,
+      email: user.email,
+      uid,
+      name: "",
+      avatar: "",
+      last_seen: new Date().toISOString(),
+    },
+  ]);
+
+  if (insertError) {
+    console.log("PROFILE ERROR:", insertError);
+    return insertError.message;
+  }
+
+  return { success: true, profileComplete: false };
 };
+  // 🔐 LOGIN
+const login = async (email: string, password: string): Promise<AuthResult> => {
 
-  const signup = (email: string, _password: string) => {
-    const stored = localStorage.getItem("chat_accounts");
-    const accounts = stored ? JSON.parse(stored) : {};
-    if (accounts[email]) return false;
-    const profile: UserProfile = { name: "", email, avatar: "" };
-    accounts[email] = { password: _password, profile };
-    localStorage.setItem("chat_accounts", JSON.stringify(accounts));
-    setUser(profile);
-    setIsAuthenticated(true);
-    localStorage.setItem("chat_user", JSON.stringify(profile));
-    return true;
-  };
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
 
-  const logout = () => {
+  if (error) {
+    const { data: profileCheck } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("email", email)
+      .single();
+
+    if (!profileCheck) {
+      return "Account not found";
+    }
+
+    return "Incorrect password";
+  }
+
+  if (!data.user) {
+    return "Login failed";
+  }
+
+  const userId = data.user.id;
+
+  let { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .single();
+
+  if (!profile) {
+    const { data: newProfile } = await supabase
+      .from("profiles")
+      .upsert([
+        {
+          id: userId,
+          email: data.user.email,
+          name: "",
+          avatar: "",
+        },
+      ])
+      .select()
+      .single();
+
+    profile = newProfile;
+  }
+
+  await supabase
+    .from("profiles")
+    .update({ last_seen: new Date().toISOString() })
+    .eq("id", userId);
+
+  setUser({
+    name: profile?.name || "",
+    email: data.user.email!,
+    avatar: profile?.avatar || "",
+  });
+
+  setIsAuthenticated(true);
+
+  return { success: true, profileComplete: !!profile?.name };
+};
+  // 🚪 LOGOUT
+  const logout = async () => {
+    const { data } = await supabase.auth.getUser();
+
+  if (data.user) {
+  await supabase
+  .from("profiles")
+  .update({
+    last_seen: new Date().toISOString(),
+  })
+    .eq("id", data.user.id);
+}
+
+    await supabase.auth.signOut();
+
     setUser(null);
     setIsAuthenticated(false);
-    localStorage.removeItem("chat_user");
   };
 
-  const updateProfile = (updates: Partial<UserProfile>) => {
+  // 🧾 PROFILE UPDATE (LOCAL + OPTIONAL DB SAVE)
+  const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!user) return;
-    const updated = { ...user, ...updates };
-    setUser(updated);
-    localStorage.setItem("chat_user", JSON.stringify(updated));
-    const stored = localStorage.getItem("chat_accounts");
-    const accounts = stored ? JSON.parse(stored) : {};
-    if (accounts[updated.email]) {
-      accounts[updated.email].profile = updated;
-      localStorage.setItem("chat_accounts", JSON.stringify(accounts));
+
+    const { data } = await supabase.auth.getUser();
+    const userId = data.user?.id;
+
+    if (userId) {
+      await supabase.from("profiles").upsert([
+        {
+          id: userId,
+          email: user.email,
+          name: updates.name,
+          avatar: updates.avatar,
+        },
+      ]);
     }
+
+    setUser({ ...user, ...updates });
   };
 
-const isProfileComplete = !!user?.name;
+  const isProfileComplete = !!user?.name;
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, isProfileComplete, login, signup, logout, updateProfile }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated,
+        isProfileComplete,
+        login,
+        signup,
+        logout,
+        updateProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

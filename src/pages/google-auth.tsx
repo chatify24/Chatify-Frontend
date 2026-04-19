@@ -1,68 +1,93 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "../supabaseClient";
 
 export default function GoogleAuth() {
 
-const navigate = useNavigate();
-const { toast } = useToast();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-useEffect(() => {
+  useEffect(() => {
 
-const params = new URLSearchParams(window.location.search);
+    const handleGoogleUser = async () => {
 
-const email = params.get("email");
-const mode = params.get("mode");
+      const { data: { user }, error } = await supabase.auth.getUser();
 
-if(!email || !mode){
-navigate("/");
-return;
-}
+      if (error || !user) {
+        navigate("/");
+        return;
+      }
 
-const stored = localStorage.getItem("chat_accounts");
-const accounts = stored ? JSON.parse(stored) : {};
+      const userId = user.id; // 🔥 IMPORTANT
+      const email = user.email;
 
-if(mode === "login"){
+      // 🔎 Check by ID (NOT email)
+      const { data: profile, error: fetchError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle();
 
-if(!accounts[email]){
-toast({
-title: "Account not found",
-description: "Please sign up first",
-variant: "destructive"
-});
-navigate("/");
-return;
-}
+      if (fetchError) {
+        console.log(fetchError);
+      }
 
-localStorage.setItem("current_user",email);
-navigate("/profile");
-return;
+      let profileHasName = !!profile?.name?.trim();
 
-}
+      // 🆕 NOT EXISTS → INSERT
+      if (!profile) {
+        const resultName = user.user_metadata?.full_name || "";
 
-if(mode === "signup"){
+        const { error: insertError } = await supabase
+          .from("profiles")
+          .insert([
+            {
+              id: userId,
+              email: email,
+              name: resultName,
+              avatar: user.user_metadata?.avatar_url || "",
+            },
+          ]);
 
-if(accounts[email]){
-toast({
-title: "Account already exists",
-description: "Please sign in",
-variant: "destructive"
-});
-navigate("/");
-return;
-}
+        if (insertError) {
+          console.log(insertError);
+          toast({
+            title: "Signup failed",
+            variant: "destructive",
+          });
+          navigate("/");
+          return;
+        }
 
-accounts[email] = { provider:"google" };
+        toast({
+          title: "Account created",
+          description: "Welcome!",
+        });
 
-localStorage.setItem("chat_accounts",JSON.stringify(accounts));
-localStorage.setItem("current_user",email);
+        profileHasName = !!resultName.trim();
+      } else {
+        toast({
+          title: "Welcome back",
+          description: "Login successful",
+        });
+      }
 
-navigate("/profile");
+      localStorage.setItem(
+        "current_user",
+        JSON.stringify({
+          id: userId,
+          email,
+        })
+      );
 
-}
+      navigate(profileHasName ? "/chat" : "/profile");
 
-},[]);
+    };
 
-return null;
+    handleGoogleUser();
 
+  }, []);
+
+  return null;
 }

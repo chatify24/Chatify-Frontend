@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "../supabaseClient";
 
 const ForgotPassword = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showOtpPopup, setShowOtpPopup] = useState(false);
-  const [resendTimer, setResendTimer] = useState(15);
+  const [resendTimer, setResendTimer] = useState(30);
 const [canResend, setCanResend] = useState(false);
 const [showResetPopup, setShowResetPopup] = useState(false);
 const [confirmPassword, setConfirmPassword] = useState("");
@@ -39,29 +40,39 @@ useEffect(() => {
 
 }, [resendTimer, showOtpPopup]);
 
-const handleReset = (e) => {
+const handleReset = async (e) => {
   e.preventDefault();
 
   if (loading) return;
 
   if (!email) {
-  toast({ title: "Please enter your email", variant: "destructive" });
-  return;
-}
-
-// check account exists
-const accounts = JSON.parse(localStorage.getItem("chat_accounts")) || {};
-
-if (!accounts[email]) {
-  toast({
-    title: "Account not found",
-    description: "Please sign up first",
-    variant: "destructive"
-  });
-  return;
-}
+    toast({ title: "Please enter your email", variant: "destructive" });
+    return;
+  }
 
   setLoading(true);
+
+  const { data: accountData, error: accountError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (accountError) {
+    toast({ title: "Unable to verify account", variant: "destructive" });
+    setLoading(false);
+    return;
+  }
+
+  if (!accountData) {
+    toast({
+      title: "Account not found",
+      description: "Please sign up first",
+      variant: "destructive",
+    });
+    setLoading(false);
+    return;
+  }
 
   setTimeout(async () => {
 
@@ -106,7 +117,7 @@ const resendOtp = async () => {
   if (!canResend) return;
 
   // UI instantly update karo
-  setResendTimer(15);
+  setResendTimer(30);
   setCanResend(false);
 
   try {
@@ -242,18 +253,6 @@ const resetPassword = () => {
       const data = await res.json();
 
       if (data.success) {
-
-        // ✅ UPDATE PASSWORD IN LOCAL STORAGE
-        const accounts = JSON.parse(localStorage.getItem("chat_accounts")) || {};
-
-        if (accounts[email]) {
-          accounts[email].password = newPassword;
-          localStorage.setItem("chat_accounts", JSON.stringify(accounts));
-        }
-
-        // optional: logout current session
-        localStorage.removeItem("chat_user");
-
         toast({
           title: "Password reset successful"
         });
@@ -295,7 +294,7 @@ const resetPassword = () => {
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary shadow-lg">
             <MessageCircle className="h-8 w-8 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Chattix</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Chatify</h1>
         </div>
 
         {/* Card */}
@@ -349,9 +348,8 @@ const resetPassword = () => {
 
     {/* OTP POPUP */}
     {showOtpPopup && (
-      <div className="fixed inset-0 flex items-center justify-center bg-black/40">
+      <div className="fixed inset-0 flex items-center justify-center bg-black/75">
         <div className="bg-card p-6 rounded-xl w-80 space-y-4">
-
           <h2 className="text-lg font-semibold text-center">
             Verify OTP
           </h2>
@@ -404,7 +402,7 @@ const resetPassword = () => {
 
     {/* RESET PASSWORD POPUP */}
 {showResetPopup && (
-  <div className="fixed inset-0 flex items-center justify-center bg-black/40">
+  <div className="fixed inset-0 flex items-center justify-center bg-black/75">
     <div className="bg-card p-6 rounded-xl w-80 space-y-4">
 
       <h2 className="text-lg font-semibold text-center">
