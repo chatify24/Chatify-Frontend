@@ -8,6 +8,9 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import cloudinary from "cloudinary";
 import multer from "multer";
 import { createClient } from '@supabase/supabase-js';
+import { createServer } from "http";
+import { Server as SocketIOServer } from "socket.io";
+
 dotenv.config();
 cloudinary.v2.config({
   cloud_name: process.env.CLOUD_NAME,
@@ -315,6 +318,476 @@ app.post("/reset-password", async (req, res) => {
   }
 
 });
-app.listen(5000, () => {
-  console.log("Server running on port 5000");
+
+// 🔌 SOCKET.IO SETUP
+const httpServer = createServer(app);
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
 });
+
+// Store online users
+const onlineUsers = new Map();
+const conversationRooms = new Map();
+
+io.on("connection", (socket) => {
+  console.log("✅ New Socket.IO connection:", socket.id);
+
+  // User comes online
+  const userId = socket.handshake.auth.userId?.toLowerCase().trim();
+  const userName = socket.handshake.auth.userName;
+  const userAvatar = socket.handshake.auth.userAvatar;
+
+  if (userId) {
+    onlineUsers.set(userId, {
+      socketId: socket.id,
+      name: userName,
+      avatar: userAvatar,
+    });
+
+    // Notify others that user is online
+    socket.broadcast.emit("user_online", userId);
+    console.log(`👤 ${userName} (${userId}) is now online`);
+  }
+
+  // Send message
+  socket.on("send_message", async (data) => {
+    try {
+      const { conversationId, content, recipientId, timestamp, messageId } = data;
+      const senderId = userId;
+      const senderName = userName;
+      const senderAvatar = userAvatar;
+
+      // 🔥 CHECK IF BLOCKED - Query blocks table
+      const { data: blockData, error: blockError } = await supabaseAdmin
+        .from("blocks")
+        .select("id")
+        .eq("blocker_email", recipientId)
+        .eq("blocked_email", senderId)
+        .single();
+
+      if (blockData) {
+        console.log(`🚫 Cannot send message: ${recipientId} blocked ${senderId}`);
+        socket.emit("message_blocked", { error: "User has blocked you" });
+        return; // Don't send or save the message
+      }
+
+      // Save message to database with status "sent"
+      const { error, data: insertedData } = await supabaseAdmin
+        .from("messages")
+        .insert([
+          {
+            conversation_id: conversationId,
+            sender_id: senderId,
+            sender_email: senderId,
+            sender_name: senderName,
+            sender_avatar: senderAvatar,
+            receiver_email: recipientId,
+            content: content,
+            created_at: new Date(timestamp).toISOString(),
+            status: "sent", // 🔥 Add delivery status
+            read_at: null, // 🔥 Will be updated when recipient reads
+          },
+        ])
+        .select();
+
+      if (error) {
+        console.error("❌ Error saving message:", error);
+      }
+
+      // Send message to recipient
+      const normalizedRecipient = recipientId?.toLowerCase().trim();
+      const recipient = onlineUsers.get(normalizedRecipient);
+      if (recipient) {
+        io.to(recipient.socketId).emit("receive_message", {
+          id: messageId, // 🔥 ALWAYS SAME ID
+          senderId,
+          senderName,
+          recipientId, 
+          senderAvatar,
+          content,
+          timestamp: new Date(timestamp),
+          conversationId,
+          status: "sent", // 🔥 Mark as delivered to recipient
+        });
+        console.log(`💬 Message sent from ${senderName} to ${recipientId}`);
+      } else {
+        console.log(`⚠️ Recipient ${recipientId} is offline`);
+      }
+    } catch (err) {
+      console.error("❌ Error handling message:", err);
+      socket.emit("message_error", { error: "Failed to send message" });
+    }
+  });
+       
+  app.post("/block", async (req, res) => {
+  const { blocker_email, blocked_email } = req.body;
+
+  const { error } = await supabaseAdmin
+    .from("blocks")
+    .insert([{ blocker_email, blocked_email }]);
+
+  if (error) return res.status(500).json({ error });
+
+  res.json({ success: true });
+});
+  // Typing indicator
+  socket.on("user_typing", (data) => {
+    const { recipientId, isTyping } = data;
+    const normalizedRecipient = recipientId?.toLowerCase().trim();
+const recipient = onlineUsers.get(normalizedRecipient);
+
+console.log("🎯 Looking for:", normalizedRecipient);
+console.log("📡 Available users:", Array.from(onlineUsers.keys()));
+    if (recipient) {
+      io.to(recipient.socketId).emit("user_typing", {
+        userId,
+        isTyping,
+      });
+    }
+  });
+
+  // Delete message for everyone
+ socket.on("delete_message_for_everyone", async (data) => {
+    try {
+      const { recipientId, messageId } = data;
+      const senderId = userId;
+      
+      console.log(`🗑️ BACKEND: Received delete event - senderId: ${senderId}, recipientId: ${recipientId}, messageId: ${messageId}`);
+      console.log(`🗑️ BACKEND: onlineUsers keys:`, Array.from(onlineUsers.keys()));
+      
+      // Emit delete event to both sender and recipient
+      const deletePayload = { messageId };
+      
+      // Send confirmation to sender
+      socket.emit("message_deleted_for_everyone", deletePayload);
+      console.log(`✅ BACKEND: Delete confirmation sent to sender ${senderId}`);
+      
+      // Send delete event to recipient if online
+      const recipient = onlineUsers.get(recipientId);
+      if (recipient) {
+        io.to(recipient.socketId).emit("message_deleted_for_everyone", deletePayload);
+        console.log(`✅ BACKEND: Delete event forwarded to ${recipientId} on socket ${recipient.socketId}`);
+      } else {
+        console.log(`⚠️ BACKEND: Recipient ${recipientId} is offline`);
+      }
+      
+      // Store delete action in database so offline users see it when they come online
+      const { error } = await supabaseAdmin
+        .from("message_deletes")
+        .insert([
+          {
+            message_id: messageId,
+            deleted_by: senderId,
+            deleted_at: new Date().toISOString(),
+          },
+        ]);
+
+      if (error) {
+        console.error("❌ Error saving delete action:", error);
+      } else {
+        console.log(`✅ BACKEND: Delete action stored in database for messageId: ${messageId}`);
+      }
+    } catch (err) {
+      console.error("❌ Error handling delete message:", err);
+      socket.emit("delete_error", { error: "Failed to delete message" });
+    }
+  });
+
+  // Mark messages as read
+  socket.on("mark_messages_read", async (data) => {
+    try {
+      const { recipientId, messageIds, timestamp } = data;
+      const readerId = userId;
+
+      console.log(`👁️ BACKEND: Received read receipt - readerId: ${readerId}, messageIds:`, messageIds);
+
+      // Update messages in database with read_at timestamp and status "read"
+      const readTimestamp = new Date(timestamp).toISOString();
+      const { error } = await supabaseAdmin
+        .from("messages")
+        .update({ 
+          read_at: readTimestamp,
+          status: "read" // 🔥 Update status to "read"
+        })
+        .in("id", messageIds);
+
+      if (error) {
+        console.error("❌ Error updating read status:", error);
+      } else {
+        console.log(`✅ BACKEND: Updated read status for ${messageIds.length} messages`);
+      }
+
+      // Send read receipt to sender with timestamp
+      const normalizedRecipient = recipientId?.toLowerCase().trim();
+      const recipient = onlineUsers.get(normalizedRecipient);
+      console.log("[v0] BACKEND: Looking for recipient:", recipientId, "Normalized:", normalizedRecipient, "Found:", !!recipient);
+      if (recipient) {
+        io.to(recipient.socketId).emit("messages_read", {
+          messageIds,
+          readerId,
+          timestamp: readTimestamp,
+          status: "read",
+        });
+        console.log(`[v0] 📤 BACKEND: Read receipt sent to ${recipientId} with timestamp ${readTimestamp}`);
+      } else {
+        console.log(`[v0] ⚠️ BACKEND: Sender ${recipientId} is offline`);
+      }
+    } catch (err) {
+      console.error("❌ Error handling read receipt:", err);
+    }
+  });
+
+  // Block user event
+  socket.on("block_user", async (data) => {
+    try {
+      const { recipientId } = data;
+      const blockerUserId = userId;
+      
+      console.log(`🚫 ${blockerUserId} blocked ${recipientId}`);
+      
+      // 🔥 Save block to database
+      const { error: blockError } = await supabaseAdmin
+        .from("blocks")
+        .insert([
+          {
+            blocker_email: blockerUserId,
+            blocked_email: recipientId,
+            created_at: new Date().toISOString(),
+          }
+        ]);
+
+      if (blockError) {
+        console.error("❌ Error saving block:", blockError);
+      } else {
+        console.log(`✅ Block saved to database: ${blockerUserId} blocked ${recipientId}`);
+      }
+      
+      // Notify the blocked user
+      const normalizedRecipient = recipientId?.toLowerCase().trim();
+      const recipient = onlineUsers.get(normalizedRecipient);
+      if (recipient) {
+        io.to(recipient.socketId).emit("user_blocked", {
+  blockerUserId,
+  recipientId, // ✅ ADD THIS
+});
+        console.log(`📤 Block notification sent to ${recipientId}`);
+      }
+    } catch (err) {
+      console.error("❌ Error handling block user:", err);
+    }
+  });
+  app.post("/unblock", async (req, res) => {
+  const { blocker_email, blocked_email } = req.body;
+
+  const { error } = await supabaseAdmin
+    .from("blocks")
+    .delete()
+    .eq("blocker_email", blocker_email)
+    .eq("blocked_email", blocked_email);
+
+  if (error) return res.status(500).json({ error });
+
+  res.json({ success: true });
+});
+
+  // Unblock user event
+  socket.on("unblock_user", async (data) => {
+    try {
+      const { recipientId } = data;
+      const unblockerUserId = userId;
+      
+      console.log(`✅ ${unblockerUserId} unblocked ${recipientId}`);
+      
+      // 🔥 Delete block from database
+      const { error: unblockError } = await supabaseAdmin
+        .from("blocks")
+        .delete()
+        .eq("blocker_email", unblockerUserId)
+        .eq("blocked_email", recipientId);
+
+      if (unblockError) {
+        console.error("❌ Error removing block:", unblockError);
+      } else {
+        console.log(`✅ Block removed from database: ${unblockerUserId} unblocked ${recipientId}`);
+      }
+      
+      // Notify the unblocked user
+      const normalizedRecipient = recipientId?.toLowerCase().trim();
+      const recipient = onlineUsers.get(normalizedRecipient);
+      if (recipient) {
+        io.to(recipient.socketId).emit("user_unblocked", {
+  blockerUserId: unblockerUserId,
+  recipientId, // ✅ ADD THIS
+});
+        console.log(`📤 Unblock notification sent to ${recipientId}`);
+      }
+    } catch (err) {
+      console.error("❌ Error handling unblock user:", err);
+    }
+  });
+
+  // User disconnects
+  socket.on("disconnect", () => {
+    if (userId && onlineUsers.has(userId)) {
+      onlineUsers.delete(userId);
+      socket.broadcast.emit("user_offline", userId);
+      console.log(`👋 ${userName} (${userId}) is now offline`);
+    }
+  });
+
+  socket.on("error", (error) => {
+    console.error("❌ Socket error:", error);
+  });
+});
+
+// 🔥 GET BLOCKED USERS - Load blocks on initial page load
+app.get("/get-blocked-users", async (req, res) => {
+  try {
+    const email = req.query.email;
+    
+    if (!email) {
+      return res.status(400).json({ error: "Email required" });
+    }
+
+    // Get all blocks where this user is the blocker
+    const { data: blocksData, error: blocksError } = await supabaseAdmin
+      .from("blocks")
+      .select("blocker_email, blocked_email")
+      .or(`blocker_email.eq.${email},blocked_email.eq.${email}`);
+
+    if (blocksError) {
+      console.error("❌ Error fetching blocks:", blocksError);
+      return res.status(500).json({ error: "Failed to fetch blocks" });
+    }
+
+    // Structure the response:
+    // blockedUsers[myEmail] = emails I blocked
+    // blockedUsers[theirEmail] = emails they blocked (includes me)
+    const blockedUsers = {};
+
+    (blocksData || []).forEach((block) => {
+      // If I'm the blocker
+      if (block.blocker_email === email) {
+        if (!blockedUsers[email]) blockedUsers[email] = [];
+        blockedUsers[email].push(block.blocked_email);
+      }
+      // If I'm blocked by someone
+      if (block.blocked_email === email) {
+        if (!blockedUsers[block.blocker_email]) blockedUsers[block.blocker_email] = [];
+        blockedUsers[block.blocker_email].push(email);
+      }
+    });
+
+    console.log(`✅ Loaded blocked users for ${email}:`, blockedUsers);
+    res.json({ blockedUsers });
+  } catch (err) {
+    console.error("❌ Error in get-blocked-users:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// 🔥 ACCEPT FRIEND REQUEST & ADD TO user_references
+app.post("/accept-friend-request", async (req, res) => {
+  try {
+    const { requestId, senderEmail, receiverEmail } = req.body;
+
+    if (!requestId || !senderEmail || !receiverEmail) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    console.log(`🤝 Accepting friend request: ${senderEmail} <-> ${receiverEmail}`);
+
+    // Update request status
+    const { error: updateError } = await supabaseAdmin
+      .from("friend_requests")
+      .update({ status: "accepted" })
+      .eq("id", requestId);
+
+    if (updateError) {
+      console.error("❌ Error updating request:", updateError);
+      return res.status(500).json({ error: "Failed to update request" });
+    }
+
+    // INSERT BOTH DIRECTIONS IN user_references
+    const { error: insertError } = await supabaseAdmin
+      .from("user_references")
+      .insert([
+        {
+          user_id: senderEmail,
+          referred_user_id: receiverEmail,
+          relationship: "friend",
+          created_at: new Date().toISOString(),
+        },
+        {
+          user_id: receiverEmail,
+          referred_user_id: senderEmail,
+          relationship: "friend",
+          created_at: new Date().toISOString(),
+        },
+      ]);
+
+    if (insertError) {
+      console.error("❌ Error inserting references:", insertError);
+      return res.status(500).json({ error: "Failed to add friend reference" });
+    }
+
+    console.log(`✅ Friend reference added for both users`);
+    res.json({ success: true, message: "Friend request accepted and references added" });
+  } catch (err) {
+    console.error("❌ Error in accept-friend-request:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// 🔥 GET BLOCKED USERS - Load blocks on initial page load
+app.get("/get-blocked-users", async (req, res) => {
+  try {
+    const email = req.query.email;
+    
+    if (!email) {
+      return res.status(400).json({ error: "Email required" });
+    }
+
+    // Get all blocks where this user is the blocker or blocked
+    const { data: blocksData, error: blocksError } = await supabaseAdmin
+      .from("blocks")
+      .select("blocker_email, blocked_email");
+
+    if (blocksError) {
+      console.error("❌ Error fetching blocks:", blocksError);
+      return res.status(500).json({ error: "Failed to fetch blocks" });
+    }
+
+    // Structure the response:
+    // blockedUsers[myEmail] = emails I blocked
+    // blockedUsers[theirEmail] = emails they blocked (includes me)
+    const blockedUsers = {};
+
+    (blocksData || []).forEach((block) => {
+      // If I'm the blocker
+      if (block.blocker_email === email) {
+        if (!blockedUsers[email]) blockedUsers[email] = [];
+        blockedUsers[email].push(block.blocked_email);
+      }
+      // If I'm blocked by someone
+      if (block.blocked_email === email) {
+        if (!blockedUsers[block.blocker_email]) blockedUsers[block.blocker_email] = [];
+        blockedUsers[block.blocker_email].push(email);
+      }
+    });
+
+    console.log(`✅ Loaded blocked users for ${email}:`, blockedUsers);
+    res.json({ blockedUsers });
+  } catch (err) {
+    console.error("❌ Error in get-blocked-users:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+httpServer.listen(5000, () => {
+  console.log("🚀 Server running on port 5000 with Socket.IO support");
+});
+

@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Routes, Route, useLocation,BrowserRouter  } from "react-router-dom";
 import { AuthProvider } from "@/lib/auth-context";
+import { SocketProvider } from "@/lib/socket-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useEffect, useState } from "react";
@@ -68,16 +69,18 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
-        <ThemeProvider>
+        <SocketProvider>
+          <ThemeProvider>
 
-          <Toaster />
-          <Sonner />
+            <Toaster />
+            <Sonner />
 
-          <BrowserRouter>
-  <AppContent />
-</BrowserRouter>
+            <BrowserRouter>
+    <AppContent />
+  </BrowserRouter>
 
-        </ThemeProvider>
+          </ThemeProvider>
+        </SocketProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

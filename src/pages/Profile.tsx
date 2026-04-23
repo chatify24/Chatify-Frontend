@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ const getInitials = (name?: string) => {
 };
 
 const Profile = () => {
-const { user, updateProfile, logout } = useAuth();
+const { user, isAuthenticated, isLoading, updateProfile, logout } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -26,6 +26,13 @@ const { user, updateProfile, logout } = useAuth();
   const [uploading, setUploading] = useState(false);
 
   const inputRef = useRef(null);
+
+  // ✅ Protect route - redirect if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      navigate("/", { replace: true });
+    }
+  }, [isAuthenticated, isLoading, navigate]);
 
   const handlePhotoChange = async (e) => {
     const file = e.target.files[0];
@@ -99,103 +106,117 @@ const handleContinue = async () => {
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
       <div className="w-full max-w-md space-y-8">
 
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">Set Up Your Profile</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Choose a photo and display name
-          </p>
-        </div>
+        {/* Loading state */}
+        {isLoading && (
+          <div className="text-center">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary"></div>
+            <p className="mt-2 text-sm text-muted-foreground">Loading...</p>
+          </div>
+        )}
 
-        <div className="rounded-2xl border bg-card p-8 shadow-sm">
+        {!isLoading && (
+          <>
+            <div className="text-center">
+              <h1 className="text-2xl font-bold">Set Up Your Profile</h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Choose a photo and display name
+              </p>
+            </div>
 
-          {/* Avatar Preview */}
-          <div className="mb-6 flex flex-col items-center gap-4">
+            <div className="rounded-2xl border bg-card p-8 shadow-sm">
 
-            <div className="relative">
-              <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-primary/20 bg-muted">
+              {/* Avatar Preview */}
+              <div className="mb-6 flex flex-col items-center gap-4">
 
-                {selectedAvatar ? (
-                  <img
-                    src={selectedAvatar}
-                    alt="Avatar"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="text-muted-foreground text-2xl font-bold">
-                    {getInitials(name) || "?"}
-                  </span>
-                )}
+                <div className="relative">
+                  <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-primary/20 bg-muted">
+
+                    {selectedAvatar ? (
+                      <img
+                        src={selectedAvatar}
+                        alt="Avatar"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-muted-foreground text-2xl font-bold">
+                        {getInitials(name) || "?"}
+                      </span>
+                    )}
+
+                  </div>
+
+                  {/* Cross delete button */}
+                  {selectedAvatar && (
+                    <button
+                      onClick={() => setSelectedAvatar("")}
+                      className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black text-white hover:bg-black/80"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Hidden file input */}
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoChange}
+                  className="hidden"
+                />
+
+                {/* Choose Photo Button */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => inputRef.current.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? "Uploading..." : selectedAvatar ? "Change Photo" : "Choose Photo"}
+                </Button>
 
               </div>
 
-              {/* Cross delete button */}
-              {selectedAvatar && (
-                <button
-                  onClick={() => setSelectedAvatar("")}
-                  className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black text-white hover:bg-black/80"
-                >
-                  <X size={14} />
-                </button>
-              )}
+              {/* Name Input */}
+              <div className="mb-6 space-y-2">
+                <label className="text-sm font-medium">Display Name</label>
+
+                <Input
+                  placeholder="Enter your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="h-12 rounded-xl"
+                />
+              </div>
+
+              <Button
+                onClick={handleContinue}
+                className={`h-12 w-full rounded-xl text-base font-semibold flex items-center justify-center gap-2
+                ${loading ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}
+              >
+                {loading && (
+                  <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                )}
+
+                {loading ? "Processing..." : "Continue to Chat"}
+              </Button>
+
             </div>
 
-            {/* Hidden file input */}
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoChange}
-              className="hidden"
-            />
-
-            {/* Choose Photo Button */}
-            <Button
+            <button
               type="button"
-              variant="outline"
-              className="rounded-xl"
-              onClick={() => inputRef.current.click()}
-              disabled={uploading}
+              onClick={() => {
+                logout();
+                navigate("/", { replace: true });
+              }}
+              className="mt-4 text-sm text-primary hover:underline w-full text-center"
             >
-              {uploading ? "Uploading..." : selectedAvatar ? "Change Photo" : "Choose Photo"}
-            </Button>
+              Back to Sign In
+            </button>
 
-          </div>
-
-          {/* Name Input */}
-          <div className="mb-6 space-y-2">
-            <label className="text-sm font-medium">Display Name</label>
-
-            <Input
-              placeholder="Enter your name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="h-12 rounded-xl"
-            />
-          </div>
-
-          <Button
-  onClick={handleContinue}
-  className={`h-12 w-full rounded-xl text-base font-semibold flex items-center justify-center gap-2
-  ${loading ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}
->
-  {loading && (
-    <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-  )}
-
-  {loading ? "Processing..." : "Continue to Chat"}
-</Button>
-<button
-  type="button"
-  onClick={() => {
-    logout();
-    navigate("/", { replace: true });
-  }}
-  className="mt-4 text-sm text-primary hover:underline w-full text-center"
->
-  Back to Sign In
-</button>
-
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

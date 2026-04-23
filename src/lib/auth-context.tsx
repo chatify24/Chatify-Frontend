@@ -6,6 +6,7 @@ export interface UserProfile {
   name: string;
   email: string;
   avatar: string;
+  uid?: string;
 }
 
 type AuthResult = { success: true; profileComplete: boolean } | string;
@@ -14,6 +15,7 @@ interface AuthContextType {
   user: UserProfile | null;
   isAuthenticated: boolean;
   isProfileComplete: boolean;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<AuthResult>;
   signup: (email: string, password: string) => Promise<AuthResult>;
   logout: () => void;
@@ -31,34 +33,40 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // 🔁 AUTO LOGIN
 // 🔁 AUTO LOGIN + ONLINE SET
 useEffect(() => {
   const getSession = async () => {
-    const { data } = await supabase.auth.getSession();
-    if (data.session?.user) {
-      const userId = data.session.user.id;
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (data.session?.user) {
+        const userId = data.session.user.id;
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", userId)
+          .single();
 
-      // 🟢 ONLINE SET
-      await supabase
-        .from("profiles")
-        .update({ last_seen: new Date().toISOString() })
-        .eq("id", userId);
+        // 🟢 ONLINE SET
+        await supabase
+          .from("profiles")
+          .update({ last_seen: new Date().toISOString() })
+          .eq("id", userId);
 
-      setUser({
-        name: profile?.name || "",
-        email: data.session.user.email!,
-        avatar: profile?.avatar || "",
-      });
+        setUser({
+          name: profile?.name || "",
+          email: data.session.user.email!,
+          avatar: profile?.avatar || "",
+          uid: profile?.uid || "",
+        });
 
-      setIsAuthenticated(true);
+        setIsAuthenticated(true);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -155,13 +163,17 @@ const login = async (email: string, password: string): Promise<AuthResult> => {
     .eq("id", userId)
     .single();
 
+  let generatedUid = "";
+
   if (!profile) {
+    generatedUid = generateUID(data.user.email || "");
     const { data: newProfile } = await supabase
       .from("profiles")
       .upsert([
         {
           id: userId,
           email: data.user.email,
+          uid: generatedUid,
           name: "",
           avatar: "",
         },
@@ -170,6 +182,15 @@ const login = async (email: string, password: string): Promise<AuthResult> => {
       .single();
 
     profile = newProfile;
+  }
+
+  if (profile && !profile.uid) {
+    generatedUid = generateUID(data.user.email || "");
+    await supabase
+      .from("profiles")
+      .update({ uid: generatedUid })
+      .eq("id", userId);
+    profile.uid = generatedUid;
   }
 
   await supabase
@@ -181,6 +202,7 @@ const login = async (email: string, password: string): Promise<AuthResult> => {
     name: profile?.name || "",
     email: data.user.email!,
     avatar: profile?.avatar || "",
+    uid: profile?.uid || generatedUid || "",
   });
 
   setIsAuthenticated(true);
@@ -235,6 +257,7 @@ const login = async (email: string, password: string): Promise<AuthResult> => {
         user,
         isAuthenticated,
         isProfileComplete,
+        isLoading,
         login,
         signup,
         logout,
