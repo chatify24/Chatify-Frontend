@@ -88,7 +88,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       // Then try to fetch from DB
       try {
-        const response = await fetch(`http://localhost:5000/get-blocked-users?email=${encodeURIComponent(user.email)}`);
+const response = await fetch(`https://chatify-backend-mrlh.onrender.com/get-blocked-users?email=${encodeURIComponent(user.email)}`);
         if (response.ok) {
           const data = await response.json();
           setBlockedUsers(data.blockedUsers || {});
@@ -106,7 +106,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!isAuthenticated || !user) return;
 
     // Initialize Socket.IO connection
-    const newSocket = io("http://localhost:5000", {
+    const newSocket = io("https://chatify-backend-mrlh.onrender.com", {
       auth: {
         userId: user.email,
         userName: user.name,

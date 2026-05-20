@@ -77,7 +77,7 @@ const handleReset = async (e) => {
   setTimeout(async () => {
 
     try {
-      const res = await fetch("http://localhost:5000/send-otp", {
+      const res = await fetch("https://chatify-backend-mrlh.onrender.com/send-otp", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -122,7 +122,7 @@ const resendOtp = async () => {
 
   try {
 
-    const res = await fetch("http://localhost:5000/resend-otp", {
+    const res = await fetch("https://chatify-backend-mrlh.onrender.com/resend-otp", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -174,7 +174,7 @@ const verifyOtp = () => {
   setTimeout(async () => {
 
     try {
-      const res = await fetch("http://localhost:5000/verify-otp", {
+      const res = await fetch("https://chatify-backend-mrlh.onrender.com/verify-otp", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -239,7 +239,7 @@ const resetPassword = () => {
 
     try {
 
-      const res = await fetch("http://localhost:5000/reset-password", {
+      const res = await fetch("https://chatify-backend-mrlh.onrender.com/reset-password", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

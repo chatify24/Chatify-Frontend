@@ -174,7 +174,7 @@ User B receives message and UI updates
 
 ### Port
 - Backend: `5000` (can be changed in Backend/server.js and socket-context.tsx)
-- Frontend connects to: `http://localhost:5000`
+- Frontend connects to: `https://chatify-backend-mrlh.onrender.com`
 
 ### CORS
 Currently allows all origins. For production, update in Backend/server.js:

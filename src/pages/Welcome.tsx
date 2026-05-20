@@ -27,7 +27,7 @@ export default function Welcome() {
   setTimeout(() => {
     // Real download trigger
     const link = document.createElement('a');
-    link.href = 'https://github.com/chatify24/chatify-download/releases/download/v1.0.0/chatify.exe';
+    link.href = 'https://github.com/chatify24/Chatify/releases/download/v1.1.4/Chatify_1.1.4_x64-setup.exe';
     link.download = 'Chatify.exe';
     document.body.appendChild(link);
     link.click();

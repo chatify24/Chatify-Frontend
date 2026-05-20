@@ -43,7 +43,7 @@ const Profile = () => {
     formData.append("image", file);
 
     try {
-      const response = await fetch("http://localhost:5000/upload-profile", {
+      const response = await fetch("https://chatify-backend-mrlh.onrender.com/upload-profile", {
         method: "POST",
         body: formData,
       });

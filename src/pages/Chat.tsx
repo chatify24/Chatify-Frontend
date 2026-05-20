@@ -213,7 +213,7 @@ const handleThemeToggle = async () => {
   formData.append("image", file);
 
   try {
-    const response = await fetch("http://localhost:5000/upload-profile", {
+const response = await fetch("https://chatify-backend-mrlh.onrender.com/upload-profile", {
       method: "POST",
       body: formData,
     });
@@ -303,7 +303,7 @@ const handleSaveProfile = async () => {
     }
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/reset-password', {
+const response = await fetch('https://chatify-backend-mrlh.onrender.com/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: user?.email, password: passwordForm.newPassword }),
@@ -2621,7 +2621,7 @@ const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const formData = new FormData();
     formData.append("image", file);
 
-    const response = await fetch("http://localhost:5000/upload-profile", {
+const response = await fetch("https://chatify-backend-mrlh.onrender.com/upload-profile", {
       method: "POST",
       body: formData,
     });
