@@ -2,9 +2,6 @@
   command = "npm run build"
   publish = "dist"
 
-[[plugins]]
-  # Next.js plugin remove
-
 [[redirects]]
   from = "/*"
   to = "/index.html"
