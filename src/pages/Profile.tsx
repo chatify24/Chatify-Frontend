@@ -16,7 +16,7 @@ const getInitials = (name?: string) => {
 };
 
 const Profile = () => {
-const { user, isAuthenticated, isLoading, updateProfile, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, updateProfile, logout } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -27,7 +27,6 @@ const { user, isAuthenticated, isLoading, updateProfile, logout } = useAuth();
 
   const inputRef = useRef(null);
 
-  // ✅ Protect route - redirect if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       navigate("/", { replace: true });
@@ -49,9 +48,7 @@ const { user, isAuthenticated, isLoading, updateProfile, logout } = useAuth();
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error("Upload failed");
-      }
+      if (!response.ok) throw new Error("Upload failed");
 
       const data = await response.json();
       setSelectedAvatar(data.imageUrl);
@@ -63,45 +60,45 @@ const { user, isAuthenticated, isLoading, updateProfile, logout } = useAuth();
     }
   };
 
-const handleContinue = async () => {
-  if (!name.trim()) {
-    toast({ title: "Please enter your name", variant: "destructive" });
-    return;
-  }
+  const handleContinue = async () => {
+    if (!name.trim()) {
+      toast({ title: "Please enter your name", variant: "destructive" });
+      return;
+    }
 
-  setLoading(true);
+    setLoading(true);
 
- 
-  const { data } = await supabase.auth.getUser();
-  const userId = data.user?.id;
+    const { data } = await supabase.auth.getUser();
+    const userId = data.user?.id;
 
-  if (!userId) {
-    toast({ title: "User not found", variant: "destructive" });
-    setLoading(false);
-    return;
-  }
+    if (!userId) {
+      toast({ title: "User not found", variant: "destructive" });
+      setLoading(false);
+      return;
+    }
 
-  const delay = new Promise(res => setTimeout(res, 2500));
+    const delay = new Promise(res => setTimeout(res, 2500));
 
-  const dbProcess = supabase.from("profiles").upsert([
-    {
-      id: userId,
-      email: data.user.email,
+    const dbProcess = supabase.from("profiles").upsert([
+      {
+        id: userId,
+        email: data.user.email,
+        name: name.trim(),
+        avatar: selectedAvatar || "",
+      },
+    ]);
+
+    await Promise.all([delay, dbProcess]);
+
+    await updateProfile({
       name: name.trim(),
       avatar: selectedAvatar || "",
-    },
-  ]);
+    });
 
-  await Promise.all([delay, dbProcess]);
+    navigate("/chat", { replace: true });
+    setLoading(false);
+  };
 
-  await updateProfile({
-    name: name.trim(),
-    avatar: selectedAvatar || "",
-  });
-
-  navigate("/chat", { replace: true });
-  setLoading(false);
-};
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
       <div className="w-full max-w-md space-y-8">
@@ -127,36 +124,27 @@ const handleContinue = async () => {
 
               {/* Avatar Preview */}
               <div className="mb-6 flex flex-col items-center gap-4">
-
                 <div className="relative">
-                  <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-primary/20 bg-muted">
-
+                  <div className="h-28 w-28 overflow-hidden rounded-full border-4 border-orange-500/20 bg-muted flex items-center justify-center">
                     {selectedAvatar ? (
-                      <img
-                        src={selectedAvatar}
-                        alt="Avatar"
-                        className="h-full w-full object-cover"
-                      />
+                      <img src={selectedAvatar} alt="Profile" className="h-full w-full object-cover" />
                     ) : (
-                      <span className="text-muted-foreground text-2xl font-bold">
+                      <div className="text-3xl font-bold text-muted-foreground">
                         {getInitials(name) || "?"}
-                      </span>
+                      </div>
                     )}
-
                   </div>
 
-                  {/* Cross delete button */}
                   {selectedAvatar && (
                     <button
                       onClick={() => setSelectedAvatar("")}
-                      className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black text-white hover:bg-black/80"
+                      className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
                     >
                       <X size={14} />
                     </button>
                   )}
                 </div>
 
-                {/* Hidden file input */}
                 <input
                   ref={inputRef}
                   type="file"
@@ -165,23 +153,22 @@ const handleContinue = async () => {
                   className="hidden"
                 />
 
-                {/* Choose Photo Button */}
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="rounded-xl"
-                  onClick={() => inputRef.current.click()}
-                  disabled={uploading}
-                >
-                  {uploading ? "Uploading..." : selectedAvatar ? "Change Photo" : "Choose Photo"}
-                </Button>
-
+              <button
+  type="button"
+  onClick={() => !uploading && inputRef.current?.click()}
+  className={`text-sm font-medium transition-colors ${
+    uploading 
+      ? "text-orange-500" 
+      : "text-orange-500 hover:text-orange-600"
+  }`}
+>
+  {uploading ? "Uploading..." : selectedAvatar ? "Change Profile Photo" : "Add Profile Photo"}
+</button>
               </div>
 
               {/* Name Input */}
               <div className="mb-6 space-y-2">
                 <label className="text-sm font-medium">Display Name</label>
-
                 <Input
                   placeholder="Enter your name"
                   value={name}
@@ -192,29 +179,24 @@ const handleContinue = async () => {
 
               <Button
                 onClick={handleContinue}
-                className={`h-12 w-full rounded-xl text-base font-semibold flex items-center justify-center gap-2
-                ${loading ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}
+                style={loading ? { opacity: 0.4, cursor: "not-allowed" } : {}}
+                className="h-12 w-full rounded-xl text-base font-semibold flex items-center justify-center gap-2 cursor-pointer"
               >
-                {loading && (
-                  <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                )}
-
-                {loading ? "Processing..." : "Continue to Chat"}
+                Continue
               </Button>
 
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  navigate("/", { replace: true });
+                }}
+                className="mt-4 text-sm text-primary hover:underline w-full text-center"
+              >
+                Back to Sign In
+              </button>
+
             </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                logout();
-                navigate("/", { replace: true });
-              }}
-              className="mt-4 text-sm text-primary hover:underline w-full text-center"
-            >
-              Back to Sign In
-            </button>
-
           </>
         )}
       </div>

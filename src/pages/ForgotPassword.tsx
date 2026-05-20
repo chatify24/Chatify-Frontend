@@ -286,13 +286,13 @@ const resetPassword = () => {
 };
   return (
   <>
-    <div className="flex min-h-screen justify-center bg-muted/30 px-4 py-2">
+<div className="flex flex-col min-h-screen items-center justify-center bg-muted/30 px-4 py-19 overflow-y-auto">
       <div className="w-full max-w-md space-y-6 mt-10">
 
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary shadow-lg">
-            <MessageCircle className="h-8 w-8 text-primary-foreground" />
+<MessageCircle className="h-7 w-7 text-primary-foreground -translate-y-0.5" strokeWidth={1.4} />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Chatify</h1>
         </div>
@@ -321,17 +321,13 @@ const resetPassword = () => {
               />
             </div>
 
-            <Button
-              type="submit"
-              className={`h-12 w-full rounded-xl text-base font-semibold flex items-center justify-center gap-2
-              ${loading ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}
-            >
-              {loading && (
-                <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              )}
-
-              {loading ? "Processing..." : "Send Reset Link"}
-            </Button>
+<button
+  type="submit"
+  className={`h-12 w-full rounded-xl text-base font-semibold transition-all bg-primary text-primary-foreground
+  ${loading ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-primary/90"}`}
+>
+  Send Reset Link
+</button>
 
             <button
               type="button"
@@ -348,7 +344,7 @@ const resetPassword = () => {
 
     {/* OTP POPUP */}
     {showOtpPopup && (
-      <div className="fixed inset-0 flex items-center justify-center bg-black/75">
+<div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
         <div className="bg-card p-6 rounded-xl w-80 space-y-4">
           <h2 className="text-lg font-semibold text-center">
             Verify OTP
@@ -382,19 +378,14 @@ const resetPassword = () => {
   )}
 
 </div>
-          <Button
-            onClick={verifyOtp}
-            className={`w-full flex items-center justify-center gap-2
-            ${verifying ? "opacity-70 cursor-not-allowed" : ""}`}
-          >
-
-            {verifying && (
-              <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            )}
-
-            {verifying ? "Verifying..." : "Verify OTP"}
-
-          </Button>
+<button
+  type="button"
+  onClick={verifyOtp}
+  className={`w-full rounded-md py-2 text-sm font-medium bg-primary text-primary-foreground transition-all
+  ${verifying ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-primary/90"}`}
+>
+  Verify OTP
+</button>
 
         </div>
       </div>
@@ -443,19 +434,14 @@ const resetPassword = () => {
         </span>
       </div>
 
-      <Button
-        onClick={resetPassword}
-        className={`w-full flex items-center justify-center gap-2
-        ${resetLoading ? "opacity-70 cursor-not-allowed" : ""}`}
-      >
-
-        {resetLoading && (
-          <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-        )}
-
-        {resetLoading ? "Resetting..." : "Reset Password"}
-
-      </Button>
+      <button
+  type="button"
+  onClick={resetPassword}
+  className={`w-full rounded-md py-2 text-sm font-medium bg-primary text-primary-foreground transition-all
+  ${resetLoading ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-primary/90"}`}
+>
+  Reset Password
+</button>
 
     </div>
   </div>

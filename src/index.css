@@ -8,34 +8,24 @@
   :root {
     --background: 30 20% 98%;
     --foreground: 20 25% 10%;
-
     --card: 0 0% 100%;
     --card-foreground: 20 25% 10%;
-
     --popover: 0 0% 100%;
     --popover-foreground: 20 25% 10%;
-
     --primary: 24 95% 53%;
     --primary-foreground: 0 0% 100%;
-
     --secondary: 30 60% 95%;
     --secondary-foreground: 24 95% 45%;
-
     --muted: 30 20% 95%;
     --muted-foreground: 20 10% 45%;
-
     --accent: 24 95% 53%;
     --accent-foreground: 0 0% 100%;
-
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-
     --border: 30 15% 90%;
     --input: 30 15% 90%;
     --ring: 24 95% 53%;
-
     --radius: 0.75rem;
-
     --sidebar-background: 20 30% 12%;
     --sidebar-foreground: 30 15% 88%;
     --sidebar-primary: 24 95% 53%;
@@ -44,44 +34,33 @@
     --sidebar-accent-foreground: 30 15% 88%;
     --sidebar-border: 20 20% 20%;
     --sidebar-ring: 24 95% 53%;
-
     --chat-bubble-own: 24 95% 53%;
     --chat-bubble-own-foreground: 0 0% 100%;
     --chat-bubble-other: 30 20% 95%;
     --chat-bubble-other-foreground: 20 25% 10%;
-
     --online: 142 71% 45%;
   }
 
   .dark {
     --background: 20 20% 7%;
     --foreground: 30 15% 95%;
-
     --card: 20 18% 11%;
     --card-foreground: 30 15% 95%;
-
     --popover: 20 18% 11%;
     --popover-foreground: 30 15% 95%;
-
     --primary: 24 95% 55%;
     --primary-foreground: 0 0% 100%;
-
     --secondary: 20 20% 16%;
     --secondary-foreground: 24 95% 55%;
-
     --muted: 20 15% 16%;
     --muted-foreground: 20 10% 55%;
-
     --accent: 24 95% 55%;
     --accent-foreground: 0 0% 100%;
-
     --destructive: 0 62% 30%;
     --destructive-foreground: 0 0% 100%;
-
     --border: 20 15% 18%;
     --input: 20 15% 18%;
     --ring: 24 95% 55%;
-
     --sidebar-background: 20 25% 5%;
     --sidebar-foreground: 30 10% 80%;
     --sidebar-primary: 24 95% 55%;
@@ -90,12 +69,10 @@
     --sidebar-accent-foreground: 30 10% 80%;
     --sidebar-border: 20 15% 14%;
     --sidebar-ring: 24 95% 55%;
-
     --chat-bubble-own: 24 95% 55%;
     --chat-bubble-own-foreground: 0 0% 100%;
     --chat-bubble-other: 20 15% 16%;
     --chat-bubble-other-foreground: 30 15% 95%;
-
     --online: 142 71% 45%;
   }
 }
@@ -108,41 +85,96 @@
     @apply bg-background text-foreground;
     font-family: 'Plus Jakarta Sans', sans-serif;
   }
-}
-body{
-  background-color:white;
-  color:black;
+
+  /* 🔥 Yeh add karo - dark mode mein saare texts fix */
+  .dark p,
+  .dark span,
+  .dark h1,
+  .dark h2,
+  .dark h3,
+  .dark h4,
+  .dark h5,
+  .dark label,
+  .dark button {
+    color: hsl(var(--foreground));
+  }
+
+  .dark input:not([disabled]),
+  .dark textarea {
+    color: hsl(var(--foreground));
+    background-color: hsl(var(--input));
+  }
 }
 
-body.dark{
-  background-color:#0f0f0f;
-  color:white;
-}
+/* 🔥 Yeh HATAO - ye override kar raha tha */
+/* body { background-color:white; color:black; } */
+/* body.dark { background-color:#0f0f0f; color:white; } */
+
 @keyframes popupSlow {
-  0% {
-    opacity: 0;
-    transform: scale(0.8) translateY(30px);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+  0% { opacity: 0; transform: scale(0.8) translateY(30px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 [data-state="open"].animate-popup {
   animation: popupSlow 1.4s ease-out forwards;
 }
+
 @keyframes scaleIn {
-  from {
-    transform: scale(0.8);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 
 .animate-scaleIn {
   animation: scaleIn 0.25s ease;
 }
+.toggle-track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  padding: 3px;
+  box-sizing: border-box;
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: background-color;
+}
+
+.toggle-track.on { background-color: #f97316; }
+.toggle-track:not(.on) { background-color: #d1d5db; }
+
+.toggle-thumb {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.thumb-on { transform: translateX(18px); }
+.thumb-off { transform: translateX(0px); }
+.EmojiPickerReact .epr-search-container input:focus {
+  border: 2px solid #ea580c !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear,
+input[type="password"]::-webkit-contacts-auto-fill-button,
+input[type="password"]::-webkit-credentials-auto-fill-button {
+  display: none;
+}
+/* Timestamp spans should NOT be overridden by global dark rule */
+.dark [data-timestamp] {
+  color: inherit !important;
+}
+.dark .receiver-bubble span,
+.dark .receiver-bubble p {
+  color: #1a1a1a !important;
+}
+

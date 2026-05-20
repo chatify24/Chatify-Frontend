@@ -17,9 +17,11 @@ export interface Message {
   text: string;
   time: string;
   isOwn: boolean;
-
+  
   // Optional media
+  
   image?: string;
+  edited?: boolean;
 
   // 🔥 NEW FEATURES SUPPORT
   isDeleted?: boolean;

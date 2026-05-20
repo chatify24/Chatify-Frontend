@@ -66,13 +66,13 @@ export default function Welcome() {
           <div className="mb-12 text-center animate-fade-in">
             <div className="inline-flex items-center justify-center mb-6 relative">
               <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent rounded-3xl blur-2xl opacity-30 animate-pulse"></div>
-              <div className="relative h-24 w-24 flex items-center justify-center rounded-3xl bg-gradient-to-br from-primary to-orange-600 shadow-2xl">
-                <MessageCircle className="h-12 w-12 text-white drop-shadow-lg" />
-              </div>
+<div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary shadow-lg">
+  <MessageCircle className="h-10 w-10 text-primary-foreground -translate-y-0.5" strokeWidth={1.4} />
+</div>
             </div>
-            <h1 className="text-5xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-primary via-orange-500 to-orange-600 bg-clip-text text-transparent">
-              Chatify
-            </h1>
+            <h1 className="text-5xl md:text-6xl font-semibold mb-4 text-foreground">
+  Chatify
+</h1>
             <p className="text-xl text-muted-foreground mb-2 font-medium">
               Lightning-fast messaging. Secure. Real-time.
             </p>
@@ -88,7 +88,7 @@ export default function Welcome() {
               { icon: Lock, title: 'End-to-End Encrypted', desc: 'Your privacy matters' },
               { icon: Clock, title: 'Always Available', desc: '24/7 reliability' }
             ].map((feature, i) => (
-              <div key={i} className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/40 backdrop-blur-sm p-5 hover:border-primary/50 hover:bg-card/60 transition-all duration-300">
+              <div key={i} className="group relative overflow-hidden rounded-2xl border border-black/10 dark:border-white/10 bg-card/40 backdrop-blur-sm p-5 hover:border-primary/40 hover:bg-card/60 transition-all duration-300 shadow-sm">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-primary/0 group-hover:from-primary/5 group-hover:to-primary/10 transition-all duration-300"></div>
                 <div className="relative">
                   <feature.icon className="h-6 w-6 text-primary mb-3 group-hover:scale-110 transition-transform" />
@@ -109,26 +109,17 @@ export default function Welcome() {
                   <p className="text-muted-foreground">Download Chatify and start chatting instantly</p>
                 </div>
 
-                {!isInstalled ? (
-                  <button
-                    onClick={handleInstallClick}
-                    className="group relative w-full px-8 py-4 rounded-xl bg-gradient-to-r from-primary to-orange-600 text-white font-semibold text-lg overflow-hidden transition-all duration-300 hover:shadow-2xl hover:shadow-primary/50 hover:scale-105 active:scale-95"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-orange-600 to-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    <div className="relative flex items-center justify-center gap-2">
-                      <Download className="h-5 w-5" />
-                      Download App Now
-                    </div>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => (window.location.href = 'chatify://open')}
-                    className="group w-full px-8 py-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold text-lg transition-all duration-300 hover:shadow-2xl hover:shadow-green-500/50 hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle2 className="h-5 w-5" />
-                    Open App
-                  </button>
-                )}
+             
+                 <button
+  onClick={handleInstallClick}
+className="w-full px-8 py-4 rounded-xl bg-primary text-white font-semibold text-lg transition-all duration-300 hover:opacity-85 active:scale-95"
+>
+  <div className="flex items-center justify-center gap-2">
+    <Download className="h-5 w-5" />
+    Download App Now
+  </div>
+</button>
+                
 
                 <p className="text-sm text-muted-foreground/60">
                   No credit card needed • Instant setup • 100% free
@@ -166,25 +157,16 @@ export default function Welcome() {
                       </p>
                     </div>
                     <div className="space-y-3">
-                     <button
+<button
   onClick={startDownload}
   disabled={isDownloading}
-  className="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-primary to-orange-600 text-white font-semibold flex items-center justify-center gap-2 transition-all duration-300
-  cursor-pointer hover:scale-105 hover:shadow-lg
-  disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
+  className="w-full px-6 py-3 rounded-xl bg-primary text-white font-semibold flex items-center justify-center gap-2 transition-all duration-300 hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:opacity-70 cursor-pointer"
 >
-  {isDownloading ? (
-    <>
-      <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-      Downloading...
-    </>
-  ) : (
-    "Yes, Download Now"
-  )}
+{isDownloading ? "Downloading...": "Yes, Download Now"}
 </button>
                       <button
                         onClick={() => setShowPopup(false)}
-                        className="w-full px-6 py-3 rounded-xl border border-border/50 bg-secondary/50 text-foreground font-semibold hover:bg-secondary/80 transition-colors"
+                        className="w-full px-6 py-3 rounded-xl border border-black/10 dark:border-white/10 bg-secondary/50 text-foreground font-semibold hover:bg-secondary/80 transition-colors shadow-sm"
                       >
                         Maybe Later
                       </button>
