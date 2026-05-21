@@ -710,12 +710,13 @@ if (!userEmail) return null;
 const isOnline = (lastSeen?: string) => {
   if (!lastSeen) return false;
   
-  // Remove any double Z issue
-  const cleaned = lastSeen.endsWith('Z') ? lastSeen : lastSeen + 'Z';
-  const diff = Date.now() - new Date(cleaned).getTime();
-  
-  console.log("isOnline check:", lastSeen, "diff:", diff, "ms");
-  return diff < 120000; // 2 minutes threshold
+  // timestamptz from supabase comes without Z sometimes
+  const normalized = lastSeen.includes('Z') || lastSeen.includes('+') 
+    ? lastSeen 
+    : lastSeen + 'Z';
+    
+  const diff = Date.now() - new Date(normalized).getTime();
+  return diff < 120000; // 2 minutes
 };
   
   // Fetch pending friend requests
@@ -2583,12 +2584,13 @@ const handleForwardTo = (targetContact: any) => {
 const isOnline = (lastSeen?: string) => {
   if (!lastSeen) return false;
   
-  // Remove any double Z issue
-  const cleaned = lastSeen.endsWith('Z') ? lastSeen : lastSeen + 'Z';
-  const diff = Date.now() - new Date(cleaned).getTime();
-  
-  console.log("isOnline check:", lastSeen, "diff:", diff, "ms");
-  return diff < 120000; // 2 minutes threshold
+  // timestamptz from supabase comes without Z sometimes
+  const normalized = lastSeen.includes('Z') || lastSeen.includes('+') 
+    ? lastSeen 
+    : lastSeen + 'Z';
+    
+  const diff = Date.now() - new Date(normalized).getTime();
+  return diff < 120000; // 2 minutes
 };
 // 😊 Close emoji picker on outside click
 useEffect(() => {
@@ -4820,20 +4822,13 @@ const updateLastSeen = async () => {
   if (!userId) return;
 
   if (preferences.online_visible === false) {
-    await supabase
-      .from("profiles")
-      .update({ last_seen: null })
-      .eq("id", userId);
+    await supabase.from("profiles").update({ last_seen: null }).eq("id", userId);
     return;
   }
 
-  // Store as proper UTC ISO string
-  const now = new Date().toISOString(); // Always UTC with Z
-  console.log("Updating last_seen to:", now);
-  
   await supabase
     .from("profiles")
-    .update({ last_seen: now })
+    .update({ last_seen: new Date().toISOString() }) // Always UTC with Z
     .eq("id", userId);
 };
 
