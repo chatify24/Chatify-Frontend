@@ -393,7 +393,7 @@ const resetPassword = () => {
 
     {/* RESET PASSWORD POPUP */}
 {showResetPopup && (
-  <div className="fixed inset-0 flex items-center justify-center bg-black/75">
+  <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
     <div className="bg-card p-6 rounded-xl w-80 space-y-4">
 
       <h2 className="text-lg font-semibold text-center">
