@@ -16,6 +16,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import Profile from "./pages/Profile";
 import Chat from "./pages/Chat";
 import NotFound from "./pages/NotFound";
+import GoogleAuth from "./pages/GoogleAuth";
 import Welcome from "./pages/Welcome";
 
 const queryClient = new QueryClient();
@@ -24,7 +25,6 @@ const queryClient = new QueryClient();
 const isTauriApp =
   typeof window !== "undefined" &&
   "__TAURI_INTERNALS__" in window;
-fetch("https://chatify-backend-mrlh.onrender.com/health").catch(() => {});
 
 function AppContent() {
   const location = useLocation();
@@ -42,10 +42,17 @@ function AppContent() {
       <Routes>
         {/* WEBSITE => Welcome */}
         {/* TAURI => Auth */}
-      
-
         <Route
           path="/"
+          element={
+            <NoInternet onVisibilityChange={setIsOffline}>
+              {isTauriApp ? <Auth /> : <Welcome />}
+            </NoInternet>
+          }
+        />
+
+        <Route
+          path="/auth"
           element={
             <NoInternet onVisibilityChange={setIsOffline}>
               <Auth />
@@ -80,7 +87,14 @@ function AppContent() {
           }
         />
 
-   
+        <Route
+          path="/google-auth"
+          element={
+            <NoInternet onVisibilityChange={setIsOffline}>
+              <GoogleAuth />
+            </NoInternet>
+          }
+        />
 
         <Route path="*" element={<NotFound />} />
       </Routes>
