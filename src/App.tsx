@@ -42,17 +42,10 @@ function AppContent() {
       <Routes>
         {/* WEBSITE => Welcome */}
         {/* TAURI => Auth */}
-        <Route
-          path="/"
-          element={
-            <NoInternet onVisibilityChange={setIsOffline}>
-              {isTauriApp ? <Auth /> : <Welcome />}
-            </NoInternet>
-          }
-        />
+      
 
         <Route
-          path="/auth"
+          path="/"
           element={
             <NoInternet onVisibilityChange={setIsOffline}>
               <Auth />

@@ -710,9 +710,12 @@ if (!userEmail) return null;
 const isOnline = (lastSeen?: string) => {
   if (!lastSeen) return false;
   
-  // +00 already hai, Z mat lagao
-  const diff = Date.now() - new Date(lastSeen).getTime();
-  console.log("diff ms:", diff); // debug ke liye
+  // timestamptz from supabase comes without Z sometimes
+  const normalized = lastSeen.includes('Z') || lastSeen.includes('+') 
+    ? lastSeen 
+    : lastSeen + 'Z';
+    
+  const diff = Date.now() - new Date(normalized).getTime();
   return diff < 120000; // 2 minutes
 };
   
@@ -2581,9 +2584,12 @@ const handleForwardTo = (targetContact: any) => {
 const isOnline = (lastSeen?: string) => {
   if (!lastSeen) return false;
   
-  // +00 already hai, Z mat lagao
-  const diff = Date.now() - new Date(lastSeen).getTime();
-  console.log("diff ms:", diff); // debug ke liye
+  // timestamptz from supabase comes without Z sometimes
+  const normalized = lastSeen.includes('Z') || lastSeen.includes('+') 
+    ? lastSeen 
+    : lastSeen + 'Z';
+    
+  const diff = Date.now() - new Date(normalized).getTime();
   return diff < 120000; // 2 minutes
 };
 // 😊 Close emoji picker on outside click

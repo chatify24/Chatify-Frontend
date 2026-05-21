@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Chatify",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "identifier": "com.chatify.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -16,7 +16,7 @@
         "width": 1200,
         "height": 800,
         "resizable": true,
-        "fullscreen": true,
+        "fullscreen": false,
         "maximized": true
       }
     ],
