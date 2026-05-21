@@ -707,11 +707,16 @@ if (!userEmail) return null;
     contactEmail: string;
   } | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const isOnline = (lastSeen?: string) => {
-    if (!lastSeen) return false;
-    const diff = Date.now() - new Date(lastSeen + "Z").getTime();
-    return diff < 60000;
-  };
+const isOnline = (lastSeen?: string) => {
+  if (!lastSeen) return false;
+  
+  // Remove any double Z issue
+  const cleaned = lastSeen.endsWith('Z') ? lastSeen : lastSeen + 'Z';
+  const diff = Date.now() - new Date(cleaned).getTime();
+  
+  console.log("isOnline check:", lastSeen, "diff:", diff, "ms");
+  return diff < 120000; // 2 minutes threshold
+};
   
   // Fetch pending friend requests
   useEffect(() => {
@@ -2577,9 +2582,13 @@ const handleForwardTo = (targetContact: any) => {
 };
 const isOnline = (lastSeen?: string) => {
   if (!lastSeen) return false;
-
-  const diff = Date.now() - new Date(lastSeen + "Z").getTime();
-  return diff < 60000; // 🔥 1 min
+  
+  // Remove any double Z issue
+  const cleaned = lastSeen.endsWith('Z') ? lastSeen : lastSeen + 'Z';
+  const diff = Date.now() - new Date(cleaned).getTime();
+  
+  console.log("isOnline check:", lastSeen, "diff:", diff, "ms");
+  return diff < 120000; // 2 minutes threshold
 };
 // 😊 Close emoji picker on outside click
 useEffect(() => {
@@ -4805,25 +4814,28 @@ useEffect(() => {
 }, [onMessageRead]);
 
 useEffect(() => {
-  const updateLastSeen = async () => {
-    const { data } = await supabase.auth.getUser();
-    const userId = data.user?.id;
-    if (!userId) return;
+const updateLastSeen = async () => {
+  const { data } = await supabase.auth.getUser();
+  const userId = data.user?.id;
+  if (!userId) return;
 
-    if (preferences.online_visible === false) {
-      // 🔥 Ek baar null set karo aur interval band karo
-      await supabase
-        .from("profiles")
-        .update({ last_seen: null })
-        .eq("id", userId);
-      return; // interval chalta rahega but null set hota rahega
-    }
-
+  if (preferences.online_visible === false) {
     await supabase
       .from("profiles")
-      .update({ last_seen: new Date().toISOString() })
+      .update({ last_seen: null })
       .eq("id", userId);
-  };
+    return;
+  }
+
+  // Store as proper UTC ISO string
+  const now = new Date().toISOString(); // Always UTC with Z
+  console.log("Updating last_seen to:", now);
+  
+  await supabase
+    .from("profiles")
+    .update({ last_seen: now })
+    .eq("id", userId);
+};
 
   // 🔥 Pehle turant run karo
   updateLastSeen();

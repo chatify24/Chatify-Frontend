@@ -24,6 +24,7 @@ const queryClient = new QueryClient();
 const isTauriApp =
   typeof window !== "undefined" &&
   "__TAURI_INTERNALS__" in window;
+fetch("https://chatify-backend-mrlh.onrender.com/health").catch(() => {});
 
 function AppContent() {
   const location = useLocation();
