@@ -87,14 +87,7 @@ function AppContent() {
           }
         />
 
-        <Route
-          path="/google-auth"
-          element={
-            <NoInternet onVisibilityChange={setIsOffline}>
-              <GoogleAuth />
-            </NoInternet>
-          }
-        />
+        
 
         <Route path="*" element={<NotFound />} />
       </Routes>
