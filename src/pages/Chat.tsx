@@ -710,13 +710,21 @@ if (!userEmail) return null;
 const isOnline = (lastSeen?: string) => {
   if (!lastSeen) return false;
   
-  // timestamptz from supabase comes without Z sometimes
-  const normalized = lastSeen.includes('Z') || lastSeen.includes('+') 
-    ? lastSeen 
-    : lastSeen + 'Z';
+  try {
+    // 🔥 FIX: Multiple format handle karo
+    let normalized = lastSeen;
+    if (!lastSeen.includes('Z') && !lastSeen.includes('+') && !lastSeen.includes('-', 10)) {
+      normalized = lastSeen + 'Z';
+    }
     
-  const diff = Date.now() - new Date(normalized).getTime();
-  return diff < 120000; // 2 minutes
+    const date = new Date(normalized);
+    if (isNaN(date.getTime())) return false; // Invalid date check
+    
+    const diff = Date.now() - date.getTime();
+    return diff < 120000; // 2 minutes
+  } catch {
+    return false;
+  }
 };
   
   // Fetch pending friend requests
@@ -2584,13 +2592,21 @@ const handleForwardTo = (targetContact: any) => {
 const isOnline = (lastSeen?: string) => {
   if (!lastSeen) return false;
   
-  // timestamptz from supabase comes without Z sometimes
-  const normalized = lastSeen.includes('Z') || lastSeen.includes('+') 
-    ? lastSeen 
-    : lastSeen + 'Z';
+  try {
+    // 🔥 FIX: Multiple format handle karo
+    let normalized = lastSeen;
+    if (!lastSeen.includes('Z') && !lastSeen.includes('+') && !lastSeen.includes('-', 10)) {
+      normalized = lastSeen + 'Z';
+    }
     
-  const diff = Date.now() - new Date(normalized).getTime();
-  return diff < 120000; // 2 minutes
+    const date = new Date(normalized);
+    if (isNaN(date.getTime())) return false; // Invalid date check
+    
+    const diff = Date.now() - date.getTime();
+    return diff < 120000; // 2 minutes
+  } catch {
+    return false;
+  }
 };
 // 😊 Close emoji picker on outside click
 useEffect(() => {
@@ -4816,28 +4832,24 @@ useEffect(() => {
 }, [onMessageRead]);
 
 useEffect(() => {
-const updateLastSeen = async () => {
-  const { data } = await supabase.auth.getUser();
-  const userId = data.user?.id;
-  if (!userId) return;
+  const updateLastSeen = async () => {
+    const { data } = await supabase.auth.getUser();
+    const userId = data.user?.id;
+    if (!userId) return;
 
-  if (preferences.online_visible === false) {
-    await supabase.from("profiles").update({ last_seen: null }).eq("id", userId);
-    return;
-  }
+    // 🔥 FIX: Always include Z for UTC
+    const now = new Date().toISOString(); // Already has Z
 
-  await supabase
-    .from("profiles")
-    .update({ last_seen: new Date().toISOString() }) // Always UTC with Z
-    .eq("id", userId);
-};
+    if (preferences.online_visible === false) {
+      await supabase.from("profiles").update({ last_seen: null }).eq("id", userId);
+      return;
+    }
 
-  // 🔥 Pehle turant run karo
+    await supabase.from("profiles").update({ last_seen: now }).eq("id", userId);
+  };
+
   updateLastSeen();
-
-  // 🔥 Phir interval
-  const interval = setInterval(updateLastSeen, 5000);
-
+  const interval = setInterval(updateLastSeen, 30000); // 🔥 5s se 30s karo - server already handles it
   return () => clearInterval(interval);
 }, [preferences.online_visible]); // 🔥 dependency add ki
 useEffect(() => {
