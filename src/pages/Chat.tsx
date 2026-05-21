@@ -721,7 +721,7 @@ const isOnline = (lastSeen?: string) => {
     if (isNaN(date.getTime())) return false; // Invalid date check
     
     const diff = Date.now() - date.getTime();
-    return diff < 120000; // 2 minutes
+    return diff < 180000; // 3c minutes
   } catch {
     return false;
   }
@@ -2603,7 +2603,7 @@ const isOnline = (lastSeen?: string) => {
     if (isNaN(date.getTime())) return false; // Invalid date check
     
     const diff = Date.now() - date.getTime();
-    return diff < 120000; // 2 minutes
+    return diff < 180000; // 3 minutes
   } catch {
     return false;
   }
@@ -4849,7 +4849,7 @@ useEffect(() => {
   };
 
   updateLastSeen();
-  const interval = setInterval(updateLastSeen, 30000); // 🔥 5s se 30s karo - server already handles it
+  const interval = setInterval(updateLastSeen, 15000); // 🔥 5s se 30s karo - server already handles it
   return () => clearInterval(interval);
 }, [preferences.online_visible]); // 🔥 dependency add ki
 useEffect(() => {
