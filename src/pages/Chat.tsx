@@ -436,48 +436,54 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
               <div className="space-y-4">
                 <div className="flex flex-col items-center gap-4">
 
-  <div className="relative">
+<div className="relative">
 
-    <div className="h-28 w-28 overflow-hidden rounded-full border-4 border-orange-500/20 bg-muted flex items-center justify-center">
-
-      {selectedAvatar ? (
-        <img
-          src={selectedAvatar}
-          alt="Profile"
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        <div className="text-3xl font-bold text-muted-foreground">
-          {getInitials(profileForm.name || user?.name || "?")}
-        </div>
-      )}
-
-    </div>
-
-    
-
+  <div className="h-28 w-28 overflow-hidden rounded-full border-4 border-orange-500/20 bg-muted flex items-center justify-center">
+    {selectedAvatar ? (
+      <img
+        src={selectedAvatar}
+        alt="Profile"
+        className="h-full w-full object-cover"
+      />
+    ) : (
+      <div className="text-3xl font-bold text-muted-foreground">
+        {getInitials(profileForm.name || user?.name || "?")}
+      </div>
+    )}
   </div>
 
-  <input
-    ref={inputRef}
-    type="file"
-    accept="image/*"
-    onChange={handlePhotoChange}
-    className="hidden"
-  />
+  {/* ✅ X button added here */}
+  {selectedAvatar && (
+    <button
+      onClick={() => setSelectedAvatar("")}
+      className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
+    >
+      <X size={14} />
+    </button>
+  )}
 
-  <button
-    type="button"
-    onClick={() => inputRef.current?.click()}
-    disabled={uploading}
-    className="text-sm text-orange-500 hover:text-orange-600 font-medium"
-  >
-    {uploading
-      ? "Uploading..."
-      : selectedAvatar
-      ? "Change Profile Photo"
-      : "Add Profile Photo"}
-  </button>
+</div>
+
+<input
+  ref={inputRef}
+  type="file"
+  accept="image/*"
+  onChange={handlePhotoChange}
+  className="hidden"
+/>
+
+<button
+  type="button"
+  onClick={() => inputRef.current?.click()}
+  disabled={uploading}
+  className="text-sm text-orange-500 hover:text-orange-600 font-medium"
+>
+  {uploading
+    ? "Uploading..."
+    : selectedAvatar
+    ? "Change Profile Photo"
+    : "Add Profile Photo"}
+</button>
 
 </div>
                 <div>
