@@ -20,7 +20,7 @@ import { savePrefs } from "@/lib/savePrefs";
 import {
   Search, Send, Paperclip, Smile, MoreVertical, Phone, Video,
   MessageCircle, Settings as SettingsIcon, LogOut, Star, Users, VolumeX,Bell, ChevronDown,
-  ImageIcon, Mic, Clock, Check, X, Ban, Pin, Reply, Forward,
+  ImageIcon, Mic, Clock, Check, X, Ban, Pin, Reply, Forward, Menu, ArrowLeft,
 } from "lucide-react";
 import {
 AlertDialog,
@@ -4167,6 +4167,11 @@ const [preferences, setPreferences] = useState<PreferencesType>({
     typing_indicator: true,
   });
 
+  // Mobile responsive state
+  const [isMobile, setIsMobile] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
+
   const getContactKey = (contact: any) => contact?.email || contact?.uid || contact?.id || "";
   const getUserKey = () => user?.email || user?.uid || "";
   const buildConversationId = (a: string, b: string) => [a, b].sort().join(":");
@@ -4279,12 +4284,33 @@ useEffect(() => {
         muted: new Set(parsed.muted || []),
         backgrounds: parsed.backgrounds || {}
       }));
-      console.log("[v0] ✅ Restored preferences from localStorage");
+    console.log("[v0] ✅ Restored preferences from localStorage");
     } catch (e) {
       console.error("[v0] Failed to restore preferences:", e);
     }
-  }
-}, [user?.email]);
+  }}, [user?.email]);
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Show chat when contact is selected on mobile
+  useEffect(() => {
+    if (isMobile && activeContact) {
+      setShowChat(true);
+    }
+  }, [activeContact, isMobile]);
+
+  const handleBackFromChat = () => {
+    setShowChat(false);
+    setShowSettingsDropdown(false);
+  };
 
 // 🔥 SAVE pinned messages to localStorage whenever they change
 // Pinned messages persist useEffect
@@ -5144,21 +5170,28 @@ const handleSelectContact = (contact: Contact) => {
     typingTimeoutRef.current = null;
   }
 
-  const msgKey = `chat_messages_${user?.email || ""}`;     // 🔥
-  const unreadKey = `chat_unread_counts_${user?.email || ""}`; // 🔥
+  const msgKey = `chat_messages_${user?.email || ""}`;
+  const unreadKey = `chat_unread_counts_${user?.email || ""}`;
 
   setActiveContact(contact);
+  
+  // 🔥 Mobile navigation - show chat and hide settings
+  if (isMobile) {
+    setShowChat(true);
+    setShowSettingsDropdown(false);
+  }
+
   const contactKey = getContactKey(contact);
 
   if (!allMessages[contactKey]) {
     setAllMessages((prev) => {
       const updated = { ...prev, [contactKey]: [] };
-      localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
+      localStorage.setItem(msgKey, JSON.stringify(updated));
       return updated;
     });
   }
 
-// 🔥 Unread count hamesha reset karo - chahe receipts ON ho ya OFF
+  // 🔥 Unread count hamesha reset karo - chahe receipts ON ho ya OFF
   if (contact.id !== "self") {
     setUnreadCounts((prev) => {
       const updated = { ...prev, [contactKey]: 0 };
@@ -5466,7 +5499,9 @@ useEffect(() => {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       
-      <ChatSidebar
+      {/* Desktop: Left Sidebar | Mobile: Hidden when chat is open */}
+      {(!isMobile || !showChat) && (
+        <ChatSidebar
   activeContact={activeContact}
   onSelect={handleSelectContact}
   filter={filter}
@@ -5492,6 +5527,62 @@ preferences={preferences}
   setPreferences={setPreferences}
   onSettingsOpen={() => setSettingsOpen(true)}
 />
+      )}
+
+{/* Desktop: Right Chat Area | Mobile: Full screen when chat is open */}
+<div className={`flex-1 flex flex-col relative ${isMobile && showChat ? "w-full" : ""}`}>
+  {/* Mobile: Back button and settings dropdown */}
+  {isMobile && showChat && activeContact && (
+    <div className="flex items-center justify-between p-3 border-b border-border bg-background">
+      <button
+        onClick={handleBackFromChat}
+        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted transition-colors"
+        aria-label="Back to contacts"
+      >
+        <ArrowLeft size={20} className="text-foreground" />
+      </button>
+      
+      <div className="flex-1 text-center">
+        <p className="text-sm font-semibold truncate">{activeContact.name}</p>
+      </div>
+      
+      {/* 3-dot menu dropdown */}
+      <div className="relative">
+        <button
+          onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
+          className="p-2 rounded-lg hover:bg-muted transition-colors"
+          aria-label="Settings menu"
+        >
+          <Menu size={20} className="text-foreground" />
+        </button>
+        
+        {showSettingsDropdown && (
+          <div className="absolute right-0 top-full mt-2 w-48 bg-card border border-border rounded-lg shadow-lg z-50">
+            <button
+              onClick={() => {
+                setSettingsOpen(true);
+                setShowSettingsDropdown(false);
+              }}
+              className="w-full text-left px-4 py-2 hover:bg-muted rounded-t-lg transition-colors flex items-center gap-2 text-sm"
+            >
+              <SettingsIcon size={16} />
+              Settings
+            </button>
+            <button
+              onClick={() => {
+                setDialogOpen(true);
+                setShowSettingsDropdown(false);
+              }}
+              className="w-full text-left px-4 py-2 hover:bg-muted rounded-b-lg transition-colors flex items-center gap-2 text-sm text-destructive"
+            >
+              <LogOut size={16} />
+              Logout
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )}
 
 <ChatArea
   contact={activeContact}
@@ -5538,6 +5629,8 @@ onSendAudio={(audioUrl: string, clientId: string) => {
   sendMessage(conversationId, audioUrl, contactKey, clientId, undefined);
 }}
 />
+</div>
+
   <SettingsModal
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}

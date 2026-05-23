@@ -45,7 +45,7 @@ export default function Welcome() {
   setIsDownloading(true);
   setTimeout(() => {
     const link = document.createElement('a');
-    link.href = 'https://github.com/chatify24/chatify_android/releases/download/v1.2.2/Chatify.apk';
+    link.href = 'https://github.com/chatify24/chatify_android/releases/download/v1.1.3/Chatify.apk';
     link.download = 'Chatify.apk';
     document.body.appendChild(link);
     link.click();
