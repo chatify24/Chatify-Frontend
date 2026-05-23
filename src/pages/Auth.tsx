@@ -9,6 +9,9 @@ import { supabase } from "../supabaseClient";
 import { generateUID } from "@/utils/uid";
 const Auth = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+const [apkUrl, setApkUrl] = useState('');
+const CURRENT_VERSION = '1.2.2';
   const [loading, setLoading] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
@@ -23,6 +26,38 @@ const Auth = () => {
   setPassword("");
   setConfirmPassword("");
 }, [isLogin]);
+useEffect(() => {
+  const checkUpdate = async () => {
+    try {
+      const isAndroid = navigator.userAgent.toLowerCase().includes('android');
+      if (!isAndroid) return;
+      const res = await fetch('https://chatify-backend-mrlh.onrender.com/app-version');
+      const data = await res.json();
+      if (data.version !== CURRENT_VERSION) {
+        setUpdateAvailable(true);
+        setApkUrl(data.apk_url);
+      }
+    } catch (err) {
+      console.log('Update check failed');
+    }
+  };
+  checkUpdate();
+}, []);
+useEffect(() => {
+  const checkUpdate = async () => {
+    try {
+      const res = await fetch('https://chatify-backend-mrlh.onrender.com/app-version');
+      const data = await res.json();
+      if (data.version !== CURRENT_VERSION) {
+        setUpdateAvailable(true);
+        setApkUrl(data.apk_url);
+      }
+    } catch (err) {
+      console.log('Update check failed');
+    }
+  };
+  checkUpdate();
+}, []);
 
 
 
@@ -128,6 +163,37 @@ else {
 
   return (
 <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-19 overflow-y-auto">
+      {updateAvailable && (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm">
+      <div className="bg-primary text-white rounded-2xl px-5 py-4 shadow-2xl flex items-center justify-between gap-4">
+        <div>
+          <p className="font-semibold text-sm">🎉 New Update Available!</p>
+          <p className="text-xs opacity-80">Tap to download latest version</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              const link = document.createElement('a');
+              link.href = apkUrl;
+              link.download = 'Chatify.apk';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}
+            className="bg-white text-primary font-bold text-xs px-3 py-2 rounded-xl hover:opacity-90"
+          >
+            Update Now
+          </button>
+          <button
+            onClick={() => setUpdateAvailable(false)}
+            className="text-white/70 hover:text-white text-xs px-2"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
   <div className="w-full max-w-md space-y-6 mt-0">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">

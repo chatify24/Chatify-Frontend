@@ -10,6 +10,7 @@ export default function Welcome() {
   const [step, setStep] = useState<'confirm' | 'downloading' | 'ready'>('confirm');
   const [isDownloading, setIsDownloading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [downloadType, setDownloadType] = useState<'windows' | 'android'>('windows');
 
   useEffect(() => {
     setMounted(true);
@@ -37,6 +38,19 @@ export default function Welcome() {
     setShowPopup(false);
 
     // Spinner off
+    setIsDownloading(false);
+  }, 5000);
+};
+  const startAndroidDownload = () => {
+  setIsDownloading(true);
+  setTimeout(() => {
+    const link = document.createElement('a');
+    link.href = 'https://github.com/chatify24/chatify_android/releases/download/v1.2.2/Chatify.apk';
+    link.download = 'Chatify.apk';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setShowPopup(false);
     setIsDownloading(false);
   }, 5000);
 };
@@ -111,12 +125,21 @@ export default function Welcome() {
 
              
                  <button
-  onClick={handleInstallClick}
+  onClick={() => { setDownloadType('windows'); handleInstallClick(); }}
 className="w-full px-8 py-4 rounded-xl bg-primary text-white font-semibold text-lg transition-all duration-300 hover:opacity-85 active:scale-95"
 >
   <div className="flex items-center justify-center gap-2">
     <Download className="h-5 w-5" />
-    Download App Now
+    Download for Windows
+  </div>
+</button>
+<button
+  onClick={() => { setDownloadType('android'); handleInstallClick(); }}
+  className="w-full px-8 py-4 rounded-xl bg-[#3DDC84] text-white font-semibold text-lg transition-all duration-300 hover:opacity-85 active:scale-95"
+>
+  <div className="flex items-center justify-center gap-2">
+    <Download className="h-5 w-5" />
+    Download for Android
   </div>
 </button>
                 
@@ -151,14 +174,18 @@ className="w-full px-8 py-4 rounded-xl bg-primary text-white font-semibold text-
                       <Download className="h-8 w-8" />
                     </div>
                     <div>
-                      <h3 className="text-2xl font-bold text-foreground mb-2">Download Chatify?</h3>
-                      <p className="text-muted-foreground text-sm">
-                        Get instant messaging with end-to-end encryption. Installation takes less than a minute.
-                      </p>
+                      <h3 className="text-2xl font-bold text-foreground mb-2">
+  {downloadType === 'android' ? 'Download for Android?' : 'Download for Windows?'}
+</h3>
+<p className="text-muted-foreground text-sm">
+  {downloadType === 'android' 
+    ? 'Install Chatify APK on your Android device. Enable unknown sources to install.' 
+    : 'Get instant messaging with end-to-end encryption. Installation takes less than a minute.'}
+</p>
                     </div>
                     <div className="space-y-3">
 <button
-  onClick={startDownload}
+  onClick={downloadType === 'android' ? startAndroidDownload : startDownload}
   disabled={isDownloading}
   className="w-full px-6 py-3 rounded-xl bg-primary text-white font-semibold flex items-center justify-center gap-2 transition-all duration-300 hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:opacity-70 cursor-pointer"
 >

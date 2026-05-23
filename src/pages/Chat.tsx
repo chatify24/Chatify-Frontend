@@ -354,67 +354,68 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-card w-[820px] h-[580px] rounded-2xl shadow-2xl border border-border flex overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4">
+      <div className="bg-card w-full h-screen sm:h-[95vh] md:h-[90vh] lg:h-[580px] sm:rounded-2xl shadow-2xl border border-border flex flex-col md:flex-row overflow-hidden max-h-screen md:max-h-[85vh] md:w-[90%] lg:w-[820px]">
         
-{/* Left Sidebar */}
-<div className="w-56 bg-card border-r border-border flex flex-col p-4">
-  <div className="flex items-center mb-5">
-    <span className="font-bold text-base">Settings</span>
+{/* Left Sidebar - Icons on mobile, full on tablet+ */}
+<div className="w-16 sm:w-20 md:w-48 lg:w-56 bg-card border-r border-border flex flex-col p-2 sm:p-3 md:p-4">
+  <div className="hidden md:flex items-center mb-4 md:mb-5">
+    <span className="font-bold text-sm md:text-base">Settings</span>
   </div>
 
-  <nav className="space-y-1 flex-1">
+  <nav className="space-y-1 flex-1 flex flex-col items-center md:items-start">
     {menuItems.map((item) => (
       <button
         key={item.id}
         onClick={() => setActiveTab(item.id)}
-        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left text-sm ${
+        className={`w-full flex items-center justify-center md:justify-start gap-2 sm:gap-3 md:gap-3 px-2 sm:px-3 md:px-4 py-2 md:py-3 rounded-lg md:rounded-xl transition-colors text-left text-xs md:text-sm ${
           activeTab === item.id
             ? 'bg-primary text-primary-foreground font-medium'
             : 'text-foreground hover:bg-muted'
         }`}
+        title={item.label}
       >
         {item.icon}
-        {item.label}
+        <span className="hidden md:inline">{item.label}</span>
       </button>
     ))}
   </nav>
 </div>
 
-       {/* Right Content */}
-<div className="flex-1 flex flex-col overflow-hidden relative">
+       {/* Right Content - Full width on mobile, flex-1 on tablet+ */}
+<div className="flex-1 flex flex-col overflow-hidden relative w-full">
   
   {/* Header */}
-  <div className="flex items-center px-6 py-4 border-b border-border">
-    <div>
-      <h2 className="text-base font-semibold">
+  <div className="flex items-center justify-between px-2 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4 border-b border-border">
+    <div className="flex-1 min-w-0">
+      <h2 className="text-xs sm:text-sm md:text-base font-semibold truncate">
         {menuItems.find(m => m.id === activeTab)?.label} Settings
       </h2>
-      <p className="text-xs text-muted-foreground">Manage your account preferences</p>
+      <p className="text-xs text-muted-foreground hidden sm:block">Manage your account preferences</p>
     </div>
   </div>
 
-  {/* Buttons - bilkul corner pe */}
-  <div className="absolute top-3 right-0 flex items-center gap-1 pr-4">
+  {/* Buttons - Responsive positioning */}
+  <div className="absolute top-1 right-1 sm:top-2 sm:right-2 md:top-3 md:right-3 flex items-center gap-0.5 sm:gap-1">
     <button
       onClick={handleThemeToggle}
-      className="p-2 hover:bg-muted rounded-lg transition-colors"
+      className="p-1 sm:p-1.5 md:p-2 hover:bg-muted rounded-lg transition-colors"
       title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
     >
       {theme === 'light'
-        ? <Moon className="w-5 h-5 text-muted-foreground" />
-        : <Sun className="w-5 h-5 text-muted-foreground" />
+        ? <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-muted-foreground" />
+        : <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-muted-foreground" />
       }
     </button>
-    <button onClick={onClose} className="group p-1.5 rounded-md transition-colors hover:bg-red-500">
-      <X className="w-6 h-6 text-muted-foreground group-hover:text-white transition-colors" />
+    <button onClick={onClose} className="group p-1 sm:p-1.5 rounded-md transition-colors hover:bg-red-500">
+      <X className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-muted-foreground group-hover:text-white transition-colors" />
     </button>
   </div>
 
   
 
-          {/* Content */}
-          <div className="flex-1 overflow-auto p-6">
+          {/* Content - Responsive padding */}
+          <div className="flex-1 overflow-auto p-2 sm:p-3 md:p-4 lg:p-6">
             {message && (
               <div className={`mb-4 p-3 rounded-xl flex items-center gap-3 text-sm ${
                 message.type === 'success'
@@ -433,12 +434,12 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
             {/* Profile Tab */}
             {activeTab === 'profile' && (
-              <div className="space-y-4">
-                <div className="flex flex-col items-center gap-4">
+              <div className="space-y-2 sm:space-y-3 md:space-y-4">
+                <div className="flex flex-col items-center gap-2 sm:gap-3 md:gap-4">
 
 <div className="relative">
 
-  <div className="h-28 w-28 overflow-hidden rounded-full border-4 border-orange-500/20 bg-muted flex items-center justify-center">
+  <div className="h-16 w-16 sm:h-20 sm:w-20 md:h-28 md:w-28 overflow-hidden rounded-full border-4 border-orange-500/20 bg-muted flex items-center justify-center">
     {selectedAvatar ? (
       <img
         src={selectedAvatar}
@@ -446,7 +447,7 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
         className="h-full w-full object-cover"
       />
     ) : (
-      <div className="text-3xl font-bold text-muted-foreground">
+      <div className="text-lg sm:text-xl md:text-3xl font-bold text-muted-foreground">
         {getInitials(profileForm.name || user?.name || "?")}
       </div>
     )}
@@ -456,9 +457,9 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   {selectedAvatar && (
     <button
       onClick={() => setSelectedAvatar("")}
-      className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
+      className="absolute -right-1 -top-1 flex h-5 sm:h-6 w-5 sm:w-6 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
     >
-      <X size={14} />
+      <X size={12} className="sm:w-3.5 sm:h-3.5" />
     </button>
   )}
 
@@ -476,31 +477,31 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   type="button"
   onClick={() => inputRef.current?.click()}
   disabled={uploading}
-  className="text-sm text-orange-500 hover:text-orange-600 font-medium"
+  className="text-xs sm:text-sm md:text-sm text-orange-500 hover:text-orange-600 font-medium"
 >
   {uploading
     ? "Uploading..."
     : selectedAvatar
-    ? "Change Profile Photo"
-    : "Add Profile Photo"}
+    ? "Change Photo"
+    : "Add Photo"}
 </button>
 
 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Change Name</label>
+                  <label className="block text-xs sm:text-sm font-medium mb-1.5">Change Name</label>
                   <input
                     type="text"
                     placeholder="Enter your full name"
-                    className="w-full px-3 py-2.5 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-sm"
+                    className="w-full px-2 sm:px-3 py-2 sm:py-2.5 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-xs sm:text-sm"
                     value={profileForm.name}
                     onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Bio</label>
+                  <label className="block text-xs sm:text-sm font-medium mb-1.5">Bio</label>
                   <textarea
                     placeholder="Tell us about yourself"
-                    className="w-full px-3 py-2.5 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-sm"
+                    className="w-full px-2 sm:px-3 py-2 sm:py-2.5 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-xs sm:text-sm"
                     rows={3}
                     value={profileForm.bio}
                     onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
@@ -509,7 +510,7 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
                 <button
                   onClick={handleSaveProfile}
                   disabled={loading}
-                  className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-medium py-2.5 rounded-xl transition-colors text-sm"
+                  className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-medium py-2 sm:py-2.5 rounded-xl transition-colors text-xs sm:text-sm"
                 >
                   {loading ? 'Saving...' : 'Save Profile'}
                 </button>
@@ -518,32 +519,32 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
             {/* Account Tab */}
             {activeTab === 'account' && (
-              <div className="space-y-4">
+              <div className="space-y-2 sm:space-y-3 md:space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Email Address</label>
+                  <label className="block text-xs sm:text-sm font-medium mb-1.5">Email Address</label>
                   <input
                     type="email"
                     disabled
-                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-muted text-muted-foreground cursor-not-allowed text-sm"
+                    className="w-full px-2 sm:px-3 py-2 sm:py-2.5 rounded-xl border border-border bg-muted text-muted-foreground cursor-not-allowed text-xs sm:text-sm"
                     value={user?.email || ''}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">New Password</label>
+                  <label className="block text-xs sm:text-sm font-medium mb-1.5">New Password</label>
                   <input
                     type="password"
                     placeholder="Enter new password"
-                    className="w-full px-3 py-2.5 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-sm"
+                    className="w-full px-2 sm:px-3 py-2 sm:py-2.5 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-xs sm:text-sm"
                     value={passwordForm.newPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Confirm Password</label>
+                  <label className="block text-xs sm:text-sm font-medium mb-1.5">Confirm Password</label>
                   <input
                     type="password"
                     placeholder="Confirm new password"
-                    className="w-full px-3 py-2.5 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-sm"
+                    className="w-full px-2 sm:px-3 py-2 sm:py-2.5 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-xs sm:text-sm"
                     value={passwordForm.confirmPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                   />
@@ -551,7 +552,7 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
                 <button
                   onClick={handleChangePassword}
                   disabled={loading || !passwordForm.newPassword}
-                  className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-medium py-2.5 rounded-xl transition-colors text-sm"
+                  className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-medium py-2 sm:py-2.5 rounded-xl transition-colors text-xs sm:text-sm"
                 >
                   {loading ? 'Updating...' : 'Change Password'}
                 </button>
@@ -560,10 +561,10 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
             {/* Privacy Tab */}
             {activeTab === 'privacy' && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors">
+              <div className="space-y-1.5 sm:space-y-2 md:space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-2 sm:p-3 md:p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors gap-2 sm:gap-3">
                   <div>
-                    <p className="font-medium text-sm">Online Status Visible</p>
+                    <p className="font-medium text-xs md:text-sm">Online Status Visible</p>
                     <p className="text-xs text-muted-foreground">Show when you're active to others</p>
                   </div>
                   <Toggle
@@ -571,9 +572,9 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
                     onChange={(v) => updatePreference('online_visible', v)}
                   />
                 </div>
-                <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between p-2 md:p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors gap-2">
                   <div>
-                    <p className="font-medium text-sm">Read Receipts</p>
+                    <p className="font-medium text-xs md:text-sm">Read Receipts</p>
                     <p className="text-xs text-muted-foreground">Show when you've read messages</p>
                   </div>
                   <Toggle
@@ -581,16 +582,16 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
                     onChange={(v) => updatePreference('read_receipts_enabled', v)}
                   />
                 </div>
-                <div className="pt-4 border-t border-border">
-                  <h3 className="font-semibold text-sm mb-3">Blocked Users</h3>
+                <div className="pt-3 md:pt-4 border-t border-border">
+                  <h3 className="font-semibold text-xs md:text-sm mb-2 md:mb-3">Blocked Users</h3>
                   {localPrefs.blocked.length > 0 ? (
                     <div className="space-y-2">
                       {localPrefs.blocked.map((email) => (
-                        <div key={email} className="flex items-center justify-between p-3 rounded-lg bg-muted border border-border">
-                          <span className="text-sm">{email}</span>
+                        <div key={email} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-2 md:p-3 rounded-lg bg-muted border border-border gap-2">
+                          <span className="text-xs md:text-sm break-all">{email}</span>
                           <button
                             onClick={() => updatePreference('blocked', localPrefs.blocked.filter(e => e !== email))}
-                            className="text-xs text-orange-600 hover:text-orange-700 font-medium"
+                            className="text-xs text-orange-600 hover:text-orange-700 font-medium whitespace-nowrap"
                           >
                             Unblock
                           </button>
@@ -598,7 +599,7 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No blocked users</p>
+                    <p className="text-xs md:text-sm text-muted-foreground">No blocked users</p>
                   )}
                 </div>
               </div>
@@ -606,10 +607,10 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
             {/* Notifications Tab */}
             {activeTab === 'notifications' && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors">
+              <div className="space-y-2 md:space-y-3">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between p-2 md:p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors gap-2">
                   <div>
-                    <p className="font-medium text-sm">Typing Indicator</p>
+                    <p className="font-medium text-xs md:text-sm">Typing Indicator</p>
                     <p className="text-xs text-muted-foreground">Show when you're typing</p>
                   </div>
                   <Toggle
