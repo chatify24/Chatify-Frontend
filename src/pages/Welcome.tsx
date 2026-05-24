@@ -187,9 +187,11 @@ className="w-full px-8 py-4 rounded-xl bg-primary text-white font-semibold text-
 <button
   onClick={downloadType === 'android' ? startAndroidDownload : startDownload}
   disabled={isDownloading}
-  className="w-full px-6 py-3 rounded-xl bg-primary text-white font-semibold flex items-center justify-center gap-2 transition-all duration-300 hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:opacity-70 cursor-pointer"
+  className={`w-full px-6 py-3 rounded-xl text-white font-semibold flex items-center justify-center gap-2 transition-all duration-300 hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-70 cursor-pointer ${
+    downloadType === 'android' ? 'bg-[#3DDC84]' : 'bg-primary'
+  }`}
 >
-{isDownloading ? "Downloading...": "Yes, Download Now"}
+  {isDownloading ? "Downloading..." : "Yes, Download Now"}
 </button>
                       <button
                         onClick={() => setShowPopup(false)}

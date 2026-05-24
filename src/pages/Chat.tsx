@@ -1161,7 +1161,7 @@ const visibleContacts = finalFiltered.filter((contact) => {
 });
 
   return (
-    <div className="flex h-full w-80 flex-col border-r bg-card relative">
+    <div className="flex h-full w-80 flex-col border-r bg-card relative pt-safe md:pt-0 pb-safe md:pb-0">
       {/* Notification Popup - Positioned over sidebar */}
       {notificationOpen && (
         <div 
@@ -2797,10 +2797,10 @@ const cancelRecording = () => {
   }
 
   return (
-    <div className="flex flex-1 flex-col relative">
+    <div className="flex flex-1 flex-col relative pt-safe md:pt-0 pb-safe md:pb-0">
       {/* Chat Header */}
  
-      <div className="flex items-center justify-between border-b px-6 py-3">
+      <div className="flex items-center justify-between border-b px-2 md:px-6 py-2 md:py-3 pt-safe gap-1 md:gap-2">
         <div className="flex items-center gap-3">
           <div className="relative">
             <button
@@ -3090,7 +3090,7 @@ const cancelRecording = () => {
 
       {/* Pinned Messages Bar */}
       {Array.from(pinnedMessages).length > 0 && (
-        <div className="border-b bg-muted/30 px-6 py-2">
+        <div className="border-b bg-muted/30 px-3 md:px-6 py-2">
           <div className="flex items-center gap-2">
             <Pin className="h-4 w-4 text-primary" />
             <span className="text-xs font-medium text-muted-foreground">
@@ -3140,7 +3140,7 @@ setTimeout(() => {
 
       {/* Messages */}
       <ScrollArea
-className={`flex-1 px-6 py-4 transition-colors ${
+className={`flex-1 px-3 md:px-6 py-4 transition-colors ${
   bgColor === "dark" ? "bg-[#1a1a1a]" :
 
   bgColor === "blue" ? "bg-blue-50" :
@@ -3370,7 +3370,7 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
 
       {/* Reply Preview Bar */}
       {replyTo && (
-        <div className="border-t border-b bg-muted/50 px-6 py-3">
+        <div className="border-t border-b bg-muted/50 px-3 md:px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
@@ -3394,7 +3394,7 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
 
       {/* Message Input */}
      {/* Message Input */}
-<div className="border-t px-6 py-4">
+<div className="border-t px-3 md:px-6 py-3 md:py-4 pb-safe">
   {/* Hidden image file input */}
   <input
     ref={imageInputRef}
@@ -3419,21 +3419,21 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
     </div>
   )}
 
-  <div className="flex items-center gap-2">
+  <div className="flex items-center gap-1 md:gap-2">
     {/* 🖼️ Image Upload Button (was red-circled) */}
     <Button
       variant="ghost"
       size="icon"
-      className="h-10 w-10 shrink-0 rounded-xl"
+      className="h-9 w-9 md:h-10 md:w-10 shrink-0 rounded-lg md:rounded-xl"
       disabled={isBlocked || imageUploading}
       onClick={() => imageInputRef.current?.click()}
       title="Send image"
     >
-      <ImageIcon className="h-5 w-5" />
+      <ImageIcon className="h-4 w-4 md:h-5 md:w-5" />
     </Button>
 
     {/* Input + emoji picker wrapper */}
-    <div className="relative flex-1">
+    <div className="relative flex-1 min-w-0">
       <Input
         ref={inputRef}
         placeholder={
@@ -3474,7 +3474,7 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
           }
         }}
-        className={`h-12 rounded-xl border-none bg-muted pr-12 text-sm ${
+        className={`h-10 md:h-12 rounded-lg md:rounded-xl border-none bg-muted pr-9 md:pr-10 text-sm ${
           isBlockedByMe || isBlockedByThem
             ? "cursor-not-allowed opacity-50 [&::placeholder]:text-red-500"
             : isRecording
@@ -3487,14 +3487,14 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
       <Button
         variant="ghost"
         size="icon"
-        className={`absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg transition-colors ${
+        className={`absolute right-0.5 md:right-1 top-1/2 h-7 w-7 md:h-8 md:w-8 -translate-y-1/2 rounded-lg transition-colors ${
           showEmojiPicker ? "bg-primary/10 text-primary" : ""
         }`}
         onClick={() => setShowEmojiPicker((prev) => !prev)}
         disabled={isBlockedByMe || isBlockedByThem}
         title="Emoji"
       >
-        <Smile className="h-5 w-5 text-muted-foreground" />
+        <Smile className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
       </Button>
     </div>
 
@@ -3503,15 +3503,15 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
   variant="ghost"
   size="icon"
   disabled={isBlockedByMe || isBlockedByThem}
-  onClick={isRecording ? cancelRecording : startRecording} // 🔥 cancel karo
-  className={`h-10 w-10 shrink-0 rounded-xl transition-colors ${
+  onClick={isRecording ? cancelRecording : startRecording}
+  className={`h-9 w-9 md:h-10 md:w-10 shrink-0 rounded-lg md:rounded-xl transition-colors ${
     isRecording
       ? "bg-red-500 text-white hover:bg-red-600 animate-pulse"
       : ""
   }`}
   title={isRecording ? "Cancel recording" : "Voice message"}
 >
-  <Mic className="h-5 w-5" />
+  <Mic className="h-4 w-4 md:h-5 md:w-5" />
 </Button>
 
     {/* Send Button */}
@@ -3519,16 +3519,16 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
 <Button
   onClick={() => {
     if (isRecording) {
-      stopRecording(); // 🔥 recording band karo aur send ho jaega
+      stopRecording();
     } else {
       handleSend();
     }
   }}
   disabled={isBlockedByMe || isBlockedByThem}
   size="icon"
-  className="h-12 w-12 shrink-0 rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+  className="h-10 w-10 md:h-12 md:w-12 shrink-0 rounded-lg md:rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
 >
-  <Send className="h-5 w-5" />
+  <Send className="h-4 w-4 md:h-5 md:w-5" />
 </Button>
   </div>
 </div>
@@ -4284,11 +4284,12 @@ useEffect(() => {
         muted: new Set(parsed.muted || []),
         backgrounds: parsed.backgrounds || {}
       }));
-    console.log("[v0] ✅ Restored preferences from localStorage");
+      console.log("[v0] ✅ Restored preferences from localStorage");
     } catch (e) {
       console.error("[v0] Failed to restore preferences:", e);
     }
-  }}, [user?.email]);
+  }
+}, [user?.email]);
 
   // Mobile detection
   useEffect(() => {
@@ -4300,13 +4301,9 @@ useEffect(() => {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Show chat when contact is selected on mobile
-  useEffect(() => {
-    if (isMobile && activeContact) {
-      setShowChat(true);
-    }
-  }, [activeContact, isMobile]);
 
+
+  // Handlers for mobile navigation
   const handleBackFromChat = () => {
     setShowChat(false);
     setShowSettingsDropdown(false);
@@ -5170,34 +5167,33 @@ const handleSelectContact = (contact: Contact) => {
     typingTimeoutRef.current = null;
   }
 
-  const msgKey = `chat_messages_${user?.email || ""}`;
-  const unreadKey = `chat_unread_counts_${user?.email || ""}`;
+  const msgKey = `chat_messages_${user?.email || ""}`;     // 🔥
+  const unreadKey = `chat_unread_counts_${user?.email || ""}`; // 🔥
 
   setActiveContact(contact);
-  
-  // 🔥 Mobile navigation - show chat and hide settings
-  if (isMobile) {
-    setShowChat(true);
-    setShowSettingsDropdown(false);
-  }
-
   const contactKey = getContactKey(contact);
 
   if (!allMessages[contactKey]) {
     setAllMessages((prev) => {
       const updated = { ...prev, [contactKey]: [] };
-      localStorage.setItem(msgKey, JSON.stringify(updated));
+      localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
       return updated;
     });
   }
 
-  // 🔥 Unread count hamesha reset karo - chahe receipts ON ho ya OFF
+// 🔥 Unread count hamesha reset karo - chahe receipts ON ho ya OFF
   if (contact.id !== "self") {
     setUnreadCounts((prev) => {
       const updated = { ...prev, [contactKey]: 0 };
       localStorage.setItem(unreadKey, JSON.stringify(updated));
       return updated;
     });
+  }
+
+  // Mobile: show chat when contact is selected
+  if (isMobile) {
+    setShowChat(true);
+    setShowSettingsDropdown(false);
   }
 };
 
@@ -5497,7 +5493,7 @@ useEffect(() => {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-background pt-safe md:pt-0 pb-safe md:pb-0">
       
       {/* Desktop: Left Sidebar | Mobile: Hidden when chat is open */}
       {(!isMobile || !showChat) && (
@@ -5530,19 +5526,20 @@ preferences={preferences}
       )}
 
 {/* Desktop: Right Chat Area | Mobile: Full screen when chat is open */}
+{(!isMobile || showChat) && (
 <div className={`flex-1 flex flex-col relative ${isMobile && showChat ? "w-full" : ""}`}>
   {/* Mobile: Back button and settings dropdown */}
   {isMobile && showChat && activeContact && (
-    <div className="flex items-center justify-between p-3 border-b border-border bg-background">
+    <div className="flex items-center gap-2 p-2 border-b border-border bg-background pt-safe">
       <button
         onClick={handleBackFromChat}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted transition-colors"
+        className="flex-shrink-0 p-1 rounded-lg hover:bg-muted transition-colors"
         aria-label="Back to contacts"
       >
         <ArrowLeft size={20} className="text-foreground" />
       </button>
       
-      <div className="flex-1 text-center">
+      <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold truncate">{activeContact.name}</p>
       </div>
       
@@ -5630,6 +5627,7 @@ onSendAudio={(audioUrl: string, clientId: string) => {
 }}
 />
 </div>
+)}
 
   <SettingsModal
         isOpen={settingsOpen}
