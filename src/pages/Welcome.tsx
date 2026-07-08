@@ -66,7 +66,7 @@ export default function Welcome() {
   if (!mounted) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary overflow-hidden relative">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-background to-orange-100 overflow-x-hidden relative">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-blob"></div>
@@ -145,7 +145,7 @@ className="w-full px-8 py-4 rounded-xl bg-primary text-white font-semibold text-
                 
 
                 <p className="text-sm text-muted-foreground/60">
-                  No credit card needed • Instant setup • 100% free
+                  No credit needed • Instant setup • 100% free
                 </p>
               </div>
             </div>

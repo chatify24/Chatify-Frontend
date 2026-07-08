@@ -17,7 +17,7 @@ export interface Message {
   text: string;
   time: string;
   isOwn: boolean;
-  
+  timestamp?: number;
   // Optional media
   
   image?: string;

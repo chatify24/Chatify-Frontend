@@ -13,11 +13,29 @@ const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetPro
   const [retryFailed, setRetryFailed] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    if (!navigator.onLine) {
-      setVisible(true);
-      onVisibilityChange?.(true);
-    }
+useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+
+        const res = await fetch(
+  `https://chatify-backend-mrlh.onrender.com/health`,
+  { method: "GET", cache: "no-store", signal: controller.signal }
+);
+        clearTimeout(timeout);
+
+        if (!res.ok) throw new Error("Not ok");
+
+        setVisible(false);
+        onVisibilityChange?.(false);
+      } catch {
+        setVisible(true);
+        onVisibilityChange?.(true);
+      }
+    };
+
+    checkConnection();
 
     const handleOnline = () => {
       setVisible(false);
@@ -43,26 +61,33 @@ const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetPro
     };
   }, []);
 
-  const handleRetry = useCallback(() => {
+const handleRetry = useCallback(() => {
     if (isRetrying) return;
     setIsRetrying(true);
     setRetryFailed(false);
 
-    timeoutRef.current = setTimeout(() => {
-      const img = new Image();
-      const ts = Date.now();
-      img.onload = () => {
+    timeoutRef.current = setTimeout(async () => {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+
+        const res = await fetch(
+  `https://chatify-backend-mrlh.onrender.com/health?_=${Date.now()}`,
+  { method: "GET", cache: "no-store", signal: controller.signal }
+);
+        clearTimeout(timeout);
+
+        if (!res.ok) throw new Error("Not ok");
+
         setVisible(false);
         setIsRetrying(false);
         setRetryFailed(false);
         onVisibilityChange?.(false);
-      };
-      img.onerror = () => {
+      } catch {
         setIsRetrying(false);
         setRetryFailed(true);
-      };
-      img.src = `https://www.google.com/favicon.ico?_=${ts}`;
-    }, 1500);
+      }
+    }, 800);
   }, [isRetrying]);
 
   return (

@@ -39,6 +39,8 @@
     --chat-bubble-other: 30 20% 95%;
     --chat-bubble-other-foreground: 20 25% 10%;
     --online: 142 71% 45%;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .dark {
@@ -81,11 +83,23 @@
   * {
     @apply border-border;
   }
+  html, body {
+  height: 100%;
+  overscroll-behavior: none;   /* ye hi bounce/shake rokta hai */
+  overscroll-behavior-y: none; /* extra safety Android ke liye */
+}
+
+#root {
+  height: 100%;
+}
   body {
     @apply bg-background text-foreground;
     font-family: 'Plus Jakarta Sans', sans-serif;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
-
+   
   /* 🔥 Yeh add karo - dark mode mein saare texts fix */
   .dark p,
   .dark span,

@@ -1,6 +1,6 @@
 "use client";
 // Add these NEW imports (keep all existing ones):
-import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
+import EmojiPicker, { EmojiClickData, Theme } from "emoji-picker-react";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
-import { User, Shield, Lock, Sun, Moon, CheckCircle, AlertCircle } from "lucide-react";
+import { User, Shield, Lock, Sun, Moon, CheckCircle, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/supabaseClient";
 
 import { Trash2 } from "lucide-react";
@@ -20,7 +20,7 @@ import { savePrefs } from "@/lib/savePrefs";
 import {
   Search, Send, Paperclip, Smile, MoreVertical, Phone, Video,
   MessageCircle, Settings as SettingsIcon, LogOut, Star, Users, VolumeX,Bell, ChevronDown,
-  ImageIcon, Mic, Clock, Check, X, Ban, Pin, Reply, Forward, Menu, ArrowLeft,
+  ImageIcon, Mic, Clock, Check, X, Ban, Pin, Reply, Forward,ChevronLeft,
 } from "lucide-react";
 import {
 AlertDialog,
@@ -99,7 +99,23 @@ const getFirstName = (name?: string) => {
 const getContactKey = (contact: any): string => {
   return contact.email || contact.uid || contact.id || "";
 };
+const formatMessageDateTime = (dateInput: Date | string | number) => {
+  const date = new Date(dateInput);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
 
+  const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  if (isToday) return `Today, ${timeStr}`;
+  if (isYesterday) return `Yesterday, ${timeStr}`;
+
+  const dateStr = date.toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" });
+  return `${dateStr}, ${timeStr}`;
+};
+  
 
 
 const SettingsModal = ({
@@ -128,6 +144,8 @@ const inputRef = useRef<HTMLInputElement | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [profileForm, setProfileForm] = useState({ name: user?.name || '', bio: '' });
   const [passwordForm, setPasswordForm] = useState({ newPassword: '', confirmPassword: '' });
+  const [showNewPassword, setShowNewPassword] = useState(false);
+const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [localPrefs, setLocalPrefs] = useState({
     online_visible: preferences.online_visible ?? true,
@@ -353,69 +371,70 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4">
-      <div className="bg-card w-full h-screen sm:h-[95vh] md:h-[90vh] lg:h-[580px] sm:rounded-2xl shadow-2xl border border-border flex flex-col md:flex-row overflow-hidden max-h-screen md:max-h-[85vh] md:w-[90%] lg:w-[820px]">
-        
-{/* Left Sidebar - Icons on mobile, full on tablet+ */}
-<div className="w-16 sm:w-20 md:w-48 lg:w-56 bg-card border-r border-border flex flex-col p-2 sm:p-3 md:p-4">
-  <div className="hidden md:flex items-center mb-4 md:mb-5">
-    <span className="font-bold text-sm md:text-base">Settings</span>
+return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+<div className="relative bg-card w-[95vw] h-[85vh] sm:w-[820px] sm:h-[580px] rounded-2xl shadow-2xl border border-border flex flex-col sm:flex-row overflow-hidden">
+  {/* Buttons - bilkul corner pe */}
+  <div className="absolute top-2 right-2 flex items-center gap-1 z-20">
+    <button
+      onClick={handleThemeToggle}
+      className="p-2 hover:bg-muted rounded-lg transition-colors"
+      title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+    >
+      {theme === 'light'
+        ? <Moon className="w-5 h-5 text-muted-foreground" />
+        : <Sun className="w-5 h-5 text-muted-foreground" />
+      }
+    </button>
+    <button onClick={onClose} className="group p-1.5 rounded-md transition-colors hover:bg-red-500">
+      <X className="w-6 h-6 text-muted-foreground group-hover:text-white transition-colors" />
+    </button>
   </div>
 
-  <nav className="space-y-1 flex-1 flex flex-col items-center md:items-start">
+      
+{/* Left Sidebar */}
+<div className="w-full sm:w-56 bg-card border-r-0 sm:border-r border-b sm:border-b-0 border-border flex flex-col p-3 sm:p-4">
+  <div className="flex items-center justify-between mb-3 sm:mb-5">
+    <span className="font-bold text-base">Settings</span>
+  </div>
+
+<nav className="flex flex-row sm:flex-col gap-2 sm:gap-0 sm:space-y-1 flex-1 overflow-x-auto pb-3">
     {menuItems.map((item) => (
       <button
         key={item.id}
         onClick={() => setActiveTab(item.id)}
-        className={`w-full flex items-center justify-center md:justify-start gap-2 sm:gap-3 md:gap-3 px-2 sm:px-3 md:px-4 py-2 md:py-3 rounded-lg md:rounded-xl transition-colors text-left text-xs md:text-sm ${
+        className={`shrink-0 sm:w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 rounded-xl transition-colors text-left text-sm whitespace-nowrap ${
           activeTab === item.id
             ? 'bg-primary text-primary-foreground font-medium'
             : 'text-foreground hover:bg-muted'
         }`}
-        title={item.label}
       >
         {item.icon}
-        <span className="hidden md:inline">{item.label}</span>
+        {item.label}
       </button>
     ))}
   </nav>
 </div>
 
-       {/* Right Content - Full width on mobile, flex-1 on tablet+ */}
-<div className="flex-1 flex flex-col overflow-hidden relative w-full">
+       {/* Right Content */}
+<div className="flex-1 flex flex-col overflow-hidden relative">
   
   {/* Header */}
-  <div className="flex items-center justify-between px-2 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4 border-b border-border">
-    <div className="flex-1 min-w-0">
-      <h2 className="text-xs sm:text-sm md:text-base font-semibold truncate">
+  <div className="flex items-center px-6 py-4 border-b border-border">
+    <div>
+      <h2 className="text-base font-semibold">
         {menuItems.find(m => m.id === activeTab)?.label} Settings
       </h2>
-      <p className="text-xs text-muted-foreground hidden sm:block">Manage your account preferences</p>
+      <p className="text-xs text-muted-foreground">Manage your account preferences</p>
     </div>
   </div>
 
-  {/* Buttons - Responsive positioning */}
-  <div className="absolute top-1 right-1 sm:top-2 sm:right-2 md:top-3 md:right-3 flex items-center gap-0.5 sm:gap-1">
-    <button
-      onClick={handleThemeToggle}
-      className="p-1 sm:p-1.5 md:p-2 hover:bg-muted rounded-lg transition-colors"
-      title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-    >
-      {theme === 'light'
-        ? <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-muted-foreground" />
-        : <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-muted-foreground" />
-      }
-    </button>
-    <button onClick={onClose} className="group p-1 sm:p-1.5 rounded-md transition-colors hover:bg-red-500">
-      <X className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-muted-foreground group-hover:text-white transition-colors" />
-    </button>
-  </div>
+
 
   
 
-          {/* Content - Responsive padding */}
-          <div className="flex-1 overflow-auto p-2 sm:p-3 md:p-4 lg:p-6">
+          {/* Content */}
+          <div className="flex-1 overflow-auto p-6">
             {message && (
               <div className={`mb-4 p-3 rounded-xl flex items-center gap-3 text-sm ${
                 message.type === 'success'
@@ -434,12 +453,12 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
             {/* Profile Tab */}
             {activeTab === 'profile' && (
-              <div className="space-y-2 sm:space-y-3 md:space-y-4">
-                <div className="flex flex-col items-center gap-2 sm:gap-3 md:gap-4">
+              <div className="space-y-4">
+                <div className="flex flex-col items-center gap-4">
 
 <div className="relative">
 
-  <div className="h-16 w-16 sm:h-20 sm:w-20 md:h-28 md:w-28 overflow-hidden rounded-full border-4 border-orange-500/20 bg-muted flex items-center justify-center">
+  <div className="h-28 w-28 overflow-hidden rounded-full border-4 border-orange-500/20 bg-muted flex items-center justify-center">
     {selectedAvatar ? (
       <img
         src={selectedAvatar}
@@ -447,7 +466,7 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
         className="h-full w-full object-cover"
       />
     ) : (
-      <div className="text-lg sm:text-xl md:text-3xl font-bold text-muted-foreground">
+      <div className="text-3xl font-bold text-muted-foreground">
         {getInitials(profileForm.name || user?.name || "?")}
       </div>
     )}
@@ -457,9 +476,9 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   {selectedAvatar && (
     <button
       onClick={() => setSelectedAvatar("")}
-      className="absolute -right-1 -top-1 flex h-5 sm:h-6 w-5 sm:w-6 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
+      className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600"
     >
-      <X size={12} className="sm:w-3.5 sm:h-3.5" />
+      <X size={14} />
     </button>
   )}
 
@@ -477,41 +496,41 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   type="button"
   onClick={() => inputRef.current?.click()}
   disabled={uploading}
-  className="text-xs sm:text-sm md:text-sm text-orange-500 hover:text-orange-600 font-medium"
+  className="text-sm text-orange-500 hover:text-orange-600 font-medium disabled:cursor-not-allowed disabled:opacity-60"
 >
   {uploading
     ? "Uploading..."
     : selectedAvatar
-    ? "Change Photo"
-    : "Add Photo"}
+    ? "Change Profile Photo"
+    : "Add Profile Photo"}
 </button>
 
 </div>
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1.5">Change Name</label>
+                  <label className="block text-sm font-medium mb-1.5">Change Name</label>
                   <input
                     type="text"
                     placeholder="Enter your full name"
-                    className="w-full px-2 sm:px-3 py-2 sm:py-2.5 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-xs sm:text-sm"
+                    className="w-full px-3 py-2.5 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-sm"
                     value={profileForm.name}
                     onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1.5">Bio</label>
+                  <label className="block text-sm font-medium mb-1.5">Bio</label>
                   <textarea
                     placeholder="Tell us about yourself"
-                    className="w-full px-2 sm:px-3 py-2 sm:py-2.5 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-xs sm:text-sm"
+                    className="w-full px-3 py-2.5 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-sm"
                     rows={3}
                     value={profileForm.bio}
                     onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
                   />
                 </div>
                 <button
-                  onClick={handleSaveProfile}
-                  disabled={loading}
-                  className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-medium py-2 sm:py-2.5 rounded-xl transition-colors text-xs sm:text-sm"
-                >
+  onClick={handleSaveProfile}
+  disabled={loading}
+  className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-xl transition-colors text-sm"
+>
                   {loading ? 'Saving...' : 'Save Profile'}
                 </button>
               </div>
@@ -519,41 +538,59 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
             {/* Account Tab */}
             {activeTab === 'account' && (
-              <div className="space-y-2 sm:space-y-3 md:space-y-4">
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1.5">Email Address</label>
+                  <label className="block text-sm font-medium mb-1.5">Email Address</label>
                   <input
                     type="email"
                     disabled
-                    className="w-full px-2 sm:px-3 py-2 sm:py-2.5 rounded-xl border border-border bg-muted text-muted-foreground cursor-not-allowed text-xs sm:text-sm"
+                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-muted text-muted-foreground cursor-not-allowed text-sm"
                     value={user?.email || ''}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1.5">New Password</label>
-                  <input
-                    type="password"
-                    placeholder="Enter new password"
-                    className="w-full px-2 sm:px-3 py-2 sm:py-2.5 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-xs sm:text-sm"
-                    value={passwordForm.newPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1.5">Confirm Password</label>
-                  <input
-                    type="password"
-                    placeholder="Confirm new password"
-                    className="w-full px-2 sm:px-3 py-2 sm:py-2.5 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-xs sm:text-sm"
-                    value={passwordForm.confirmPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                  />
-                </div>
-                <button
-                  onClick={handleChangePassword}
-                  disabled={loading || !passwordForm.newPassword}
-                  className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-medium py-2 sm:py-2.5 rounded-xl transition-colors text-xs sm:text-sm"
-                >
+<div>
+  <label className="block text-sm font-medium mb-1.5">New Password</label>
+  <div className="relative">
+    <input
+      type={showNewPassword ? "text" : "password"}
+      placeholder="Enter new password"
+      className="w-full px-3 py-2.5 pr-10 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-sm"
+      value={passwordForm.newPassword}
+      onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+    />
+    <button
+      type="button"
+      onClick={() => setShowNewPassword((prev) => !prev)}
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+    >
+      {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+    </button>
+  </div>
+</div>
+<div>
+  <label className="block text-sm font-medium mb-1.5">Confirm Password</label>
+  <div className="relative">
+    <input
+      type={showConfirmPassword ? "text" : "password"}
+      placeholder="Confirm new password"
+      className="w-full px-3 py-2.5 pr-10 rounded-xl border border-border focus:outline-none focus:ring-2 focus:ring-orange-500 bg-background text-sm"
+      value={passwordForm.confirmPassword}
+      onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+    />
+    <button
+      type="button"
+      onClick={() => setShowConfirmPassword((prev) => !prev)}
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+    >
+      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+    </button>
+  </div>
+</div>
+               <button
+  onClick={handleChangePassword}
+  disabled={loading || !passwordForm.newPassword}
+  className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-xl transition-colors text-sm"
+>
                   {loading ? 'Updating...' : 'Change Password'}
                 </button>
               </div>
@@ -561,10 +598,10 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
             {/* Privacy Tab */}
             {activeTab === 'privacy' && (
-              <div className="space-y-1.5 sm:space-y-2 md:space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-2 sm:p-3 md:p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors gap-2 sm:gap-3">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors">
                   <div>
-                    <p className="font-medium text-xs md:text-sm">Online Status Visible</p>
+                    <p className="font-medium text-sm">Online Status Visible</p>
                     <p className="text-xs text-muted-foreground">Show when you're active to others</p>
                   </div>
                   <Toggle
@@ -572,9 +609,9 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
                     onChange={(v) => updatePreference('online_visible', v)}
                   />
                 </div>
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between p-2 md:p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors gap-2">
+                <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors">
                   <div>
-                    <p className="font-medium text-xs md:text-sm">Read Receipts</p>
+                    <p className="font-medium text-sm">Read Receipts</p>
                     <p className="text-xs text-muted-foreground">Show when you've read messages</p>
                   </div>
                   <Toggle
@@ -582,16 +619,16 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
                     onChange={(v) => updatePreference('read_receipts_enabled', v)}
                   />
                 </div>
-                <div className="pt-3 md:pt-4 border-t border-border">
-                  <h3 className="font-semibold text-xs md:text-sm mb-2 md:mb-3">Blocked Users</h3>
+                <div className="pt-4 border-t border-border">
+                  <h3 className="font-semibold text-sm mb-3">Blocked Users</h3>
                   {localPrefs.blocked.length > 0 ? (
                     <div className="space-y-2">
                       {localPrefs.blocked.map((email) => (
-                        <div key={email} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-2 md:p-3 rounded-lg bg-muted border border-border gap-2">
-                          <span className="text-xs md:text-sm break-all">{email}</span>
+                        <div key={email} className="flex items-center justify-between p-3 rounded-lg bg-muted border border-border">
+                          <span className="text-sm">{email}</span>
                           <button
                             onClick={() => updatePreference('blocked', localPrefs.blocked.filter(e => e !== email))}
-                            className="text-xs text-orange-600 hover:text-orange-700 font-medium whitespace-nowrap"
+                            className="text-xs text-orange-600 hover:text-orange-700 font-medium"
                           >
                             Unblock
                           </button>
@@ -599,7 +636,7 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs md:text-sm text-muted-foreground">No blocked users</p>
+                    <p className="text-sm text-muted-foreground">No blocked users</p>
                   )}
                 </div>
               </div>
@@ -607,10 +644,10 @@ const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
             {/* Notifications Tab */}
             {activeTab === 'notifications' && (
-              <div className="space-y-2 md:space-y-3">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between p-2 md:p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors gap-2">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors">
                   <div>
-                    <p className="font-medium text-xs md:text-sm">Typing Indicator</p>
+                    <p className="font-medium text-sm">Typing Indicator</p>
                     <p className="text-xs text-muted-foreground">Show when you're typing</p>
                   </div>
                   <Toggle
@@ -649,7 +686,8 @@ const ChatSidebar = ({
   setPreviewTitle,
   typingStatus,
   unreadCounts,
-    allMessages, 
+  contactOrder,
+  allMessages, 
   preferences,
   setPreferences,
   onSettingsOpen,
@@ -664,6 +702,7 @@ const ChatSidebar = ({
   setSearchQuery: (q: string) => void;
   user: any;
   uid: string;
+  contactOrder: Record<string, number>;
   onLogout: () => void;
   dialogOpen: boolean;
   setDialogOpen: (v: boolean) => void;
@@ -684,11 +723,12 @@ preferences: PreferencesType;
   const userEmail = authUser?.email;
   const navigate = useNavigate();
 if (!userEmail) return null;
-
+  
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [requestLoading, setRequestLoading] = useState(false);
   const [searchUID, setSearchUID] = useState("");
   const [foundUser, setFoundUser] = useState<any>(null);
+  const [restoreMode, setRestoreMode] = useState(false); // 🔥 NEW
   const [loadingUser, setLoadingUser] = useState(false);
   const [searchDelayActive, setSearchDelayActive] = useState(false);
   const [infoDialog, setInfoDialog] = useState({
@@ -698,9 +738,18 @@ if (!userEmail) return null;
   
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [sentRequests, setSentRequests] = useState<any[]>([]);
+const [notifTab, setNotifTab] = useState<'received' | 'sent'>('received');
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [loadingStates, setLoadingStates] = useState({});
-  const [acceptedFriends, setAcceptedFriends] = useState<any[]>([]);
+  const [acceptedFriends, setAcceptedFriends] = useState<any[]>(() => {
+  try {
+    const cached = localStorage.getItem(`friends_cache_${authUser?.email || ""}`);
+    return cached ? JSON.parse(cached) : [];
+  } catch {
+    return [];
+  }
+});
   const [contextMenu, setContextMenu] = useState<{
     contactId: string;
     contactName: string;
@@ -735,152 +784,209 @@ const isOnline = (lastSeen?: string) => {
 };
   
   // Fetch pending friend requests
-  useEffect(() => {
-    const fetchPendingRequests = async () => {
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const { data: userData } = await supabase.auth.getUser();
-        const receiverEmail =
-          authUser?.email ||
-          sessionData.session?.user?.email ||
-          userData.user?.email;
+useEffect(() => {
+  const fetchPendingRequests = async () => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: userData } = await supabase.auth.getUser();
+      const receiverEmail =
+        authUser?.email ||
+        sessionData.session?.user?.email ||
+        userData.user?.email;
 
-        if (!receiverEmail) {
-          console.warn("No receiver email found for pending requests", {
-            authUserEmail: authUser?.email,
-            sessionData,
-          });
-          setPendingRequests([]);
-          return;
-        }
-
-        const { data: requests, error } = await supabase
-          .from("friend_requests")
-          .select("id,sender_email,receiver_email,status")
-          .eq("receiver_email", receiverEmail)
-          .eq("status", "pending");
-
-        if (error) {
-          console.error("Error fetching requests:", error);
-          setPendingRequests([]);
-          return;
-        }
-
-        const senderEmails =
-          (requests || []).map((r: any) => r.sender_email).filter(Boolean) || [];
-
-        const { data: senderProfiles } = senderEmails.length
-          ? await supabase
-              .from("profiles")
-              .select("id, name, email, avatar, uid, last_seen")
-              .in("email", senderEmails)
-          : { data: [] };
-
-        const requestsWithProfiles = (requests || []).map((request: any) => ({
-          ...request,
-          senderProfile:
-            senderProfiles?.find((profile: any) => profile.email === request.sender_email) ||
-            null,
-        }));
-
-        console.log("Pending requests for receiverEmail", receiverEmail, {
+      if (!receiverEmail) {
+        console.warn("No receiver email found for pending requests", {
           authUserEmail: authUser?.email,
-          requests: requestsWithProfiles,
+          sessionData,
         });
-        setPendingRequests(requestsWithProfiles);
-      } catch (error) {
+        setPendingRequests([]);
+        return;
+      }
+
+     const { data: requests, error } = await supabase
+  .from("friend_requests")
+  .select("id,sender_email,receiver_email,status")
+  .eq("receiver_email", receiverEmail)
+  .eq("status", "pending");  // 🔥 wapas add kar diya
+
+      if (error) {
         console.error("Error fetching requests:", error);
         setPendingRequests([]);
+        return;
       }
-    };
 
+      const senderEmails =
+        (requests || []).map((r: any) => r.sender_email).filter(Boolean) || [];
+
+      const { data: senderProfiles } = senderEmails.length
+        ? await supabase
+            .from("profiles")
+            .select("id, name, email, avatar, uid, last_seen")
+            .in("email", senderEmails)
+        : { data: [] };
+
+      const requestsWithProfiles = (requests || []).map((request: any) => ({
+        ...request,
+        senderProfile:
+          senderProfiles?.find((profile: any) => profile.email === request.sender_email) ||
+          null,
+      }));
+
+      setPendingRequests(requestsWithProfiles);
+    } catch (error) {
+      console.error("Error fetching requests:", error);
+      setPendingRequests([]);
+    }
+  };
+
+  // 🔥 NEW: Sent requests fetch karne wala function
+  const fetchSentRequests = async () => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: userData } = await supabase.auth.getUser();
+      const senderEmail =
+        authUser?.email ||
+        sessionData.session?.user?.email ||
+        userData.user?.email;
+
+      if (!senderEmail) {
+        setSentRequests([]);
+        return;
+      }
+
+     const { data: requests, error } = await supabase
+  .from("friend_requests")
+  .select("id,sender_email,receiver_email,status")
+  .eq("sender_email", senderEmail)
+  .eq("status", "pending")  // 🔥 sirf pending
+  .order("id", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching sent requests:", error);
+        setSentRequests([]);
+        return;
+      }
+
+      const receiverEmails =
+        (requests || []).map((r: any) => r.receiver_email).filter(Boolean) || [];
+
+      const { data: receiverProfiles } = receiverEmails.length
+        ? await supabase
+            .from("profiles")
+            .select("id, name, email, avatar, uid")
+            .in("email", receiverEmails)
+        : { data: [] };
+
+      const requestsWithProfiles = (requests || []).map((request: any) => ({
+        ...request,
+        receiverProfile:
+          receiverProfiles?.find((profile: any) => profile.email === request.receiver_email) ||
+          null,
+      }));
+
+      setSentRequests(requestsWithProfiles);
+    } catch (error) {
+      console.error("Error fetching sent requests:", error);
+      setSentRequests([]);
+    }
+  };
+
+  fetchPendingRequests();
+  fetchSentRequests(); // 🔥 NEW
+
+  // Subscribe to real-time updates
+  const subscription = supabase
+    .channel("friend_requests")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "friend_requests" },
+      () => {
+        fetchPendingRequests();
+        fetchSentRequests(); // 🔥 NEW
+      }
+    )
+    .subscribe();
+
+  const interval = setInterval(() => {
     fetchPendingRequests();
+    fetchSentRequests(); // 🔥 NEW
+  }, 5000);
 
-    // Subscribe to real-time updates
-    const subscription = supabase
-      .channel("friend_requests")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "friend_requests" },
-        () => {
-          fetchPendingRequests();
-        }
-      )
-      .subscribe();
-
-    const interval = setInterval(fetchPendingRequests, 5000);
-
-    return () => {
-      subscription.unsubscribe();
-      clearInterval(interval);
-    };
-  }, [authUser]);
+  return () => {
+    subscription.unsubscribe();
+    clearInterval(interval);
+  };
+}, [authUser]);
 
   // Fetch accepted friends
 useEffect(() => {
   const fetchAcceptedFriends = async () => {
     try {
-      const { data } = await supabase.auth.getSession();
-      const userEmail = data.session?.user?.email;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userEmail = sessionData.session?.user?.email;
       if (!userEmail) return;
 
-      const { data: sentRequests, error: sentError } = await supabase
+      // ✅ FRESH fetch from DB - har baar latest value aayegi
+      const { data: myPrefs } = await supabase
+        .from("user_preferences")
+        .select("online_visible")
+        .eq("user_id", userEmail)
+        .single();
+
+      const myOnlineVisible = myPrefs?.online_visible !== false;
+
+      // Ab rest ke requests...
+      const { data: sentRequests } = await supabase
         .from("friend_requests")
         .select("id,receiver_email")
         .eq("sender_email", userEmail)
         .eq("status", "accepted");
 
-      const { data: receivedRequests, error: receivedError } = await supabase
+      const { data: receivedRequests } = await supabase
         .from("friend_requests")
         .select("id,sender_email")
         .eq("receiver_email", userEmail)
         .eq("status", "accepted");
 
-      if (sentError || receivedError) {
-        console.error("Error fetching accepted friend requests:", sentError || receivedError);
-        return;
-      }
-
       const receiverEmails = sentRequests?.map((r: any) => r.receiver_email).filter(Boolean) || [];
       const senderEmails = receivedRequests?.map((r: any) => r.sender_email).filter(Boolean) || [];
-      // Deduplicate: use Set to remove duplicate emails
       const friendEmails = Array.from(new Set([...receiverEmails, ...senderEmails]));
 
-   const { data: friendProfiles, error: profileError } = friendEmails.length
+      const { data: deletedList } = await supabase
+        .from("deleted_contacts")
+        .select("contact_email")
+        .eq("user_email", userEmail);
+
+      const deletedSet = new Set((deletedList || []).map((d: any) => d.contact_email));
+      const visibleFriendEmails = friendEmails.filter((e) => !deletedSet.has(e));
+
+      const { data: friendProfiles } = visibleFriendEmails.length
         ? await supabase
             .from("profiles")
             .select("id, name, email, avatar, uid, last_seen")
-            .in("email", friendEmails)
-        : { data: [], error: null };
+            .in("email", visibleFriendEmails)
+        : { data: [] };
 
-      // 🔥 Har friend ka online_visible check karo
-      const friendPrefs = friendEmails.length ? await supabase
-        .from("user_preferences")
-        .select("user_id, online_visible")
-        .in("user_id", friendEmails) : { data: [] };
+      const friendPrefs = visibleFriendEmails.length
+        ? await supabase
+            .from("user_preferences")
+            .select("user_id, online_visible")
+            .in("user_id", visibleFriendEmails)
+        : { data: [] };
 
-      if (profileError) {
-        console.error("Error fetching friend profiles:", profileError);
-        return;
-      }
-
-      // Deduplicate by email before mapping
       const uniqueProfiles = Array.from(
         new Map(
           (friendProfiles || []).map((profile: any) => [profile.email, profile])
         ).values()
       );
 
-const friends: any[] = uniqueProfiles
+      // ✅ YAH PE myOnlineVisible USE KAR (fresh DB se, props se nahi)
+      const friends: any[] = uniqueProfiles
         .map((profile: any) => {
-          // 🔥 Us friend ka online_visible check karo
           const pref = (friendPrefs.data || []).find(
             (p: any) => p.user_id === profile.email
           );
-          const onlineVisible = pref ? pref.online_visible !== false : true;
-
-// 🔥 Mera apna online_visible check karo
-          const myOnlineVisible = preferences?.online_visible !== false;
+          const friendOnlineVisible = pref ? pref.online_visible !== false : true;
 
           return {
             id: profile.email || profile.uid || profile.id,
@@ -889,11 +995,8 @@ const friends: any[] = uniqueProfiles
             lastMessage: "Connected as friends",
             time: "",
             unread: 0,
-            // 🔥 Agar maine status hide kiya hai toh mujhe bhi doosron ka status nahi dikhega
-            // Agar unhone hide kiya hai toh unka status nahi dikhega
-           // 🔥 Agar mera status OFF hai toh mujhe kisi ka bhi status nahi dikhega
-            last_seen: myOnlineVisible
-              ? (onlineVisible ? (profile.last_seen || null) : null)
+            last_seen: (myOnlineVisible && friendOnlineVisible)
+              ? (profile.last_seen || null)
               : null,
             email: profile.email,
             uid: profile.uid,
@@ -901,17 +1004,25 @@ const friends: any[] = uniqueProfiles
         })
         .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
-      setAcceptedFriends(friends);
-      setFriends(friends);
+      setAcceptedFriends((prev) => {
+        const prevKey = prev.map(f => `${f.id}|${f.last_seen}|${f.name}|${f.avatar}`).join(",");
+        const newKey = friends.map(f => `${f.id}|${f.last_seen}|${f.name}|${f.avatar}`).join(",");
+
+        if (prevKey === newKey) return prev;
+
+        if (userEmail) {
+          localStorage.setItem(`friends_cache_${userEmail}`, JSON.stringify(friends));
+        }
+        setFriends(friends);
+        return friends;
+      });
     } catch (error) {
       console.error("Error fetching accepted friends:", error);
     }
   };
 
-  // 🔥 initial load
   fetchAcceptedFriends();
 
-  // 🔥 realtime friend_requests changes
   const subscription = supabase
     .channel("accepted_friends")
     .on(
@@ -923,65 +1034,13 @@ const friends: any[] = uniqueProfiles
     )
     .subscribe();
 
-  // 🔥 realtime profile last_seen updates
-const profileSubscription = supabase
-    .channel("profile_online_status")
-    .on(
-      "postgres_changes",
-      { event: "UPDATE", schema: "public", table: "profiles" },
-      async (payload) => {
-        if (payload.new?.email) {
-          // 🔥 Us friend ka online_visible check karo
-          const { data: prefData } = await supabase
-            .from("user_preferences")
-            .select("online_visible")
-            .eq("user_id", payload.new.email)
-            .single();
-
-          const friendOnlineVisible = prefData ? prefData.online_visible !== false : true;
-
-          // 🔥 Mera online_visible check karo
-          const myOnlineVisible = preferences?.online_visible !== false;
-
-          // 🔥 Dono check hone ke baad hi last_seen set karo
-          const finalLastSeen = (myOnlineVisible && friendOnlineVisible)
-            ? payload.new.last_seen
-            : null;
-setAcceptedFriends((prev) => {
-  const updated = prev.map((friend) => {
-    if (
-      friend.email?.toLowerCase().trim() ===
-      payload.new.email?.toLowerCase().trim()
-    ) {
-      return {
-        ...friend,
-        last_seen: finalLastSeen,
-        avatar: payload.new.avatar || friend.avatar,
-        name: payload.new.name || friend.name,
-      };
-    }
-
-    return friend;
-  });
-
-  setFriends(updated);
-
-  return updated;
-});
-        }
-      }
-    )
-    .subscribe();
-
-  // 🔥🔥🔥 MOST IMPORTANT (auto refresh fallback)
-const interval = setInterval(fetchAcceptedFriends, 3000);
+  const interval = setInterval(fetchAcceptedFriends, 3000);
 
   return () => {
     subscription.unsubscribe();
-    profileSubscription.unsubscribe();
     clearInterval(interval);
   };
-}, [authUser, preferences?.online_visible]); // 🔥 dependency add ki
+}, [authUser]); // ✅ SIRF authUser - preferences?.online_visible hata do // 🔥 dependency add ki
 
   // Close context menu on outside click
   useEffect(() => {
@@ -1088,11 +1147,9 @@ const handleAcceptRequest = async (requestId: string, senderEmail: string) => {
   );
 
 const getSortTime = (contactId: string) => {
-  const friend = friends.find(f => f.id === contactId);
+  const friend = acceptedFriends.find(f => f.id === contactId);
   const key = (friend?.email || contactId || "").toLowerCase().trim();
-  const msgs = allMessages[key] || [];
-  if (msgs.length === 0) return 0;
-  return msgs.length + (unreadCounts[contactId] || 0) * 1000;
+  return contactOrder[key] || 0; // 🔥 ab allMessages nahi, saved order use hoga
 };
 
   const baseContacts = [
@@ -1112,9 +1169,13 @@ const getSortTime = (contactId: string) => {
   ];
   // 🔥 WhatsApp style - latest message wala contact upar
   const selfContact = baseContacts.find(c => c.id === "self");
-  const sortedOthers = baseContacts
-    .filter(c => c.id !== "self")
-    .sort((a, b) => getSortTime(b.id) - getSortTime(a.id));
+const sortedOthers = baseContacts
+  .filter(c => c.id !== "self")
+  .sort((a, b) => {
+    const diff = getSortTime(b.id) - getSortTime(a.id);
+    if (diff !== 0) return diff;
+    return (a.name || "").localeCompare(b.name || "");
+  });
   const sortedContacts = selfContact ? [selfContact, ...sortedOthers] : sortedOthers;
 
 const filteredByType = (() => {
@@ -1161,9 +1222,10 @@ const visibleContacts = finalFiltered.filter((contact) => {
 });
 
   return (
-    <div className="flex h-full w-80 flex-col border-r bg-card relative pt-safe md:pt-0 pb-safe md:pb-0">
+    <div className="flex h-full w-full md:w-80 flex-col border-r bg-card relative">
+
       {/* Notification Popup - Positioned over sidebar */}
-      {notificationOpen && (
+{notificationOpen && (
         <div 
           data-notification-popup
           className="absolute top-16 left-2 right-2 bg-card border border-border rounded-lg shadow-lg z-50 flex flex-col max-h-96 overflow-y-auto"
@@ -1172,99 +1234,193 @@ const visibleContacts = finalFiltered.filter((contact) => {
           <div className="flex justify-between items-center p-3 border-b border-border sticky top-0 bg-card">
             <span className="text-sm font-semibold text-foreground">Friend Requests</span>
             <button
-  onClick={() => setNotificationOpen(false)}
-  className="text-muted-foreground hover:bg-red-500 hover:text-white p-1.5 rounded-md transition-colors"
->
-  <X size={16} />
-</button>
+              onClick={() => setNotificationOpen(false)}
+              className="text-muted-foreground hover:bg-red-500 hover:text-white p-1.5 rounded-md transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* 🔥 NEW: Tabs */}
+          <div className="flex border-b border-border sticky top-[49px] bg-card z-10">
+            <button
+              onClick={() => setNotifTab('received')}
+              className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                notifTab === 'received'
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Received {pendingRequests.length > 0 && `(${pendingRequests.length})`}
+            </button>
+            <button
+              onClick={() => setNotifTab('sent')}
+              className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                notifTab === 'sent'
+                  ? 'text-primary border-b-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Sent {sentRequests.length > 0 && `(${sentRequests.length})`}
+            </button>
           </div>
 
           {/* Content */}
           <div className="flex-1">
-            {pendingRequests.length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
-                <Clock size={32} className="mb-2 opacity-50" />
-                <p className="text-sm">No requests pending</p>
-              </div>
-            ) : (
-              pendingRequests.map((request: any) => (
-                <div
-                  key={request.id}
-                  className="flex items-center gap-3 p-3 border-b border-border hover:bg-muted/50 transition-colors"
-                >
-                  {/* Avatar */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (request.senderProfile?.avatar) {
-                        setPreviewImage(request.senderProfile.avatar);
-                        setPreviewTitle(getFirstName(request.senderProfile?.name || request.senderProfile?.uid || request.sender_email || "Profile"));
-                      }
-                    }}
-                    disabled={!request.senderProfile?.avatar}
-                    className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-border bg-muted text-muted-foreground text-sm font-bold flex-shrink-0"
-                  >
-                    {request.senderProfile?.avatar ? (
-                      <img
-                        src={request.senderProfile.avatar}
-                        alt={request.senderProfile?.name || "Profile"}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <span>
-                        {getInitials(
-                          request.senderProfile?.name ||
-                          request.senderProfile?.uid ||
-                          request.sender_email ||
-                          "?"
-                        )}
-                      </span>
-                    )}
-                  </button>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate">
-                      {request.senderProfile?.name || request.senderProfile?.uid || request.senderProfile?.email || request.sender_email || "Unknown"}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground truncate">
-                      {request.senderProfile?.email
-                        ? request.senderProfile.email
-                        : request.sender_email
-                        ? request.sender_email
-                        : request.senderProfile?.uid
-                        ? `UID: ${request.senderProfile.uid}`
-                        : "Unknown"}
-                    </p>
-                  </div>
-
-                  {/* Buttons */}
-                  <div className="flex gap-1.5 flex-shrink-0">
-                    <button
-                      onClick={() => handleAcceptRequest(request.id, request.sender_email)}
-                      disabled={loadingStates[request.id]}
-                      className="w-7 h-7 rounded-md bg-primary text-primary-foreground hover:opacity-80 disabled:opacity-50 flex items-center justify-center transition-opacity"
-                    >
-                      <Check size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleRejectRequest(request.id)}
-                      disabled={loadingStates[request.id]}
-                      className="w-7 h-7 rounded-md bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-50 flex items-center justify-center transition-colors"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
+            {notifTab === 'received' ? (
+              pendingRequests.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
+                  <Clock size={32} className="mb-2 opacity-50" />
+                  <p className="text-sm">No requests received</p>
                 </div>
-              ))
+              ) : (
+               pendingRequests.map((request: any) => (
+  <div
+    key={request.id}
+    className="flex items-center gap-3 p-3 border-b border-border hover:bg-muted/50 transition-colors"
+  >
+    {/* Avatar */}
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (request.senderProfile?.avatar) {
+          setPreviewImage(request.senderProfile.avatar);
+          setPreviewTitle(getFirstName(request.senderProfile?.name || request.senderProfile?.uid || request.sender_email || "Profile"));
+        }
+      }}
+      disabled={!request.senderProfile?.avatar}
+      className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-border bg-muted text-muted-foreground text-sm font-bold flex-shrink-0"
+    >
+      {request.senderProfile?.avatar ? (
+        <img
+          src={request.senderProfile.avatar}
+          alt={request.senderProfile?.name || "Profile"}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <span>
+          {getInitials(
+            request.senderProfile?.name ||
+            request.senderProfile?.uid ||
+            request.sender_email ||
+            "?"
+          )}
+        </span>
+      )}
+    </button>
+
+    {/* Info */}
+    <div className="flex-1 min-w-0">
+      <p className="text-xs font-semibold truncate">
+        {request.senderProfile?.name || request.senderProfile?.uid || request.senderProfile?.email || request.sender_email || "Unknown"}
+      </p>
+      <p className="text-[10px] text-muted-foreground truncate">
+        {request.senderProfile?.email
+          ? request.senderProfile.email
+          : request.sender_email
+          ? request.sender_email
+          : request.senderProfile?.uid
+          ? `UID: ${request.senderProfile.uid}`
+          : "Unknown"}
+      </p>
+    </div>
+
+    {/* Buttons */}
+    <div className="flex gap-1.5 flex-shrink-0">
+      <button
+        onClick={() => handleAcceptRequest(request.id, request.sender_email)}
+        disabled={loadingStates[request.id]}
+        className="w-7 h-7 rounded-md bg-primary text-primary-foreground hover:opacity-80 disabled:opacity-50 flex items-center justify-center transition-opacity"
+      >
+        <Check size={14} />
+      </button>
+      <button
+        onClick={() => handleRejectRequest(request.id)}
+        disabled={loadingStates[request.id]}
+        className="w-7 h-7 rounded-md bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-50 flex items-center justify-center transition-colors"
+      >
+        <X size={14} />
+      </button>
+    </div>
+  </div>
+))
+              )
+            ) : (
+              // 🔥 NEW: Sent requests tab
+              sentRequests.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
+                  <Clock size={32} className="mb-2 opacity-50" />
+                  <p className="text-sm">No requests sent</p>
+                </div>
+              ) : (
+                sentRequests.map((request: any) => (
+  <div
+    key={request.id}
+    className="flex items-center gap-3 p-3 border-b border-border hover:bg-muted/50 transition-colors"
+  >
+    {/* Avatar */}
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (request.receiverProfile?.avatar) {
+          setPreviewImage(request.receiverProfile.avatar);
+          setPreviewTitle(
+            getFirstName(
+              request.receiverProfile?.name ||
+              request.receiverProfile?.uid ||
+              request.receiver_email ||
+              "Profile"
+            )
+          );
+        }
+      }}
+      disabled={!request.receiverProfile?.avatar}
+      className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-border bg-muted text-muted-foreground text-sm font-bold flex-shrink-0"
+    >
+      {request.receiverProfile?.avatar ? (
+        <img
+          src={request.receiverProfile.avatar}
+          alt={request.receiverProfile?.name || "Profile"}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <span>
+          {getInitials(
+            request.receiverProfile?.name ||
+            request.receiverProfile?.uid ||
+            request.receiver_email ||
+            "?"
+          )}
+        </span>
+      )}
+    </button>
+
+    {/* Info */}
+    <div className="flex-1 min-w-0">
+      <p className="text-xs font-semibold truncate">
+        {request.receiverProfile?.name || request.receiverProfile?.uid || request.receiver_email || "Unknown"}
+      </p>
+    </div>
+
+    {/* Status Badge - hamesha Pending */}
+    <div className="text-[10px] font-semibold px-2 py-1 rounded-full flex-shrink-0 bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400">
+      Pending
+    </div>
+  </div>
+))
+              )
             )}
           </div>
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between border-b px-5 py-4">
+     {/* Header */}
+      <div 
+        className="flex items-center justify-between border-b px-5 py-4"
+        style={{ paddingTop: 'calc(0.25rem + env(safe-area-inset-top, 0px))' }}
+      >
         <div className="flex items-center gap-3">
           <span className="text-lg font-bold">Messages</span>
         </div>
@@ -1299,21 +1455,57 @@ const visibleContacts = finalFiltered.filter((contact) => {
       </div>
 <div className="px-4 pb-1 mt-3">
   <div className="flex gap-2">
-    <Input
+   <Input
   placeholder="Search by UID"
   value={searchUID}
-  onChange={(e) => setSearchUID(e.target.value)}
-className="
-  h-10 rounded-xl
-  border-2 border-gray-300
-  focus:border-orange-600
-  focus:ring-0 focus:outline-none
-  shadow-none focus:shadow-none
-"
+  onChange={(e) => {
+    const raw = e.target.value;
+    console.log("🔎 RAW INPUT:", JSON.stringify(raw), "Length:", raw.length);
+    setSearchUID(raw);
+  }}
+  autoCapitalize="none"
+  autoCorrect="off"
+  autoComplete="off"
+  spellCheck="false"
+  className="
+    h-10 rounded-xl
+    border-2 border-gray-300
+    focus:border-orange-600
+    focus:ring-0 focus:outline-none
+    shadow-none focus:shadow-none
+  "
 />
     <Button
       onClick={async () => {
         if (!searchUID.trim()) return;
+        // 🔍 TEMPORARY DEBUG - isse hum exact truth pata karenge
+const { data: allData, error: allError } = await supabase
+  .from("profiles")
+  .select("id, name, uid");
+
+console.log("=== TOTAL PROFILES FOUND ===", allData?.length);
+console.log("=== RLS/FETCH ERROR (agar hai) ===", allError);
+
+const typedTrimmed = searchUID.trim();
+const target = allData?.find(p => p.uid === typedTrimmed);
+const closeMatch = allData?.find(p => 
+  p.uid?.toLowerCase() === typedTrimmed.toLowerCase()
+);
+
+console.log("EXACT match found?:", !!target);
+console.log("Case-insensitive match found?:", !!closeMatch);
+
+if (closeMatch && !target) {
+  console.log("DB uid (exact):", JSON.stringify(closeMatch.uid));
+  console.log("Typed uid (exact):", JSON.stringify(typedTrimmed));
+  console.log("DB char codes:", [...closeMatch.uid].map(c => c.charCodeAt(0)));
+  console.log("Typed char codes:", [...typedTrimmed].map(c => c.charCodeAt(0)));
+}
+
+if (!target && !closeMatch) {
+  console.log("⚠️ Ye UID DB mein exist hi nahi karta — na exact, na case-insensitive");
+  console.log("Available UIDs in DB:", allData?.map(p => p.uid));
+}
 
         // 🔥 Check if searching for own UID
         if (searchUID.trim() === uid) {
@@ -1334,12 +1526,21 @@ className="
 
         const { data: authData } = await supabase.auth.getUser();
         const currentUserId = authData?.user?.id;
+        const currentUserEmail = authData?.user?.email;
 
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("id, name, email, uid")
-          .eq("uid", searchUID)
-          .single();
+        // 🔍 DEBUG - console mein check karo exact value kya ja rahi hai
+        console.log("Searching UID:", JSON.stringify(searchUID.trim()), "Length:", searchUID.trim().length);
+
+     const cleanedUID = searchUID.trim().replace(/\s+/g, "");
+
+const { data, error } = await supabase
+  .from("profiles")
+  .select("id, name, email, uid")
+  .ilike("uid", cleanedUID)
+  .single();
+
+        // 🔍 DEBUG - query ka result bhi console mein dekho
+        console.log("Query result:", data, "Error:", error);
 
         if (error || !data) {
           setFoundUser(null);
@@ -1355,11 +1556,44 @@ className="
             message: "You cannot send a request to yourself",
           });
         } else {
-          setFoundUser(data);
-        }
+  // 🔥 Check karo ki pehle se accepted friend hai aur delete kiya tha
+  const { data: existingRequest1 } = await supabase
+    .from("friend_requests")
+    .select("id, status")
+    .eq("sender_email", currentUserEmail)
+    .eq("receiver_email", data.email)
+    .maybeSingle();
 
-        setLoadingUser(false);
-        setSearchDelayActive(false);
+  const { data: existingRequest2 } = await supabase
+    .from("friend_requests")
+    .select("id, status")
+    .eq("sender_email", data.email)
+    .eq("receiver_email", currentUserEmail)
+    .maybeSingle();
+
+  const existingRequest = existingRequest1 || existingRequest2;
+
+  let isRestore = false;
+
+  if (existingRequest?.status === "accepted") {
+    const { data: deletedRow } = await supabase
+      .from("deleted_contacts")
+      .select("id")
+      .eq("user_email", currentUserEmail)
+      .eq("contact_email", data.email)
+      .maybeSingle();
+
+    if (deletedRow) {
+      isRestore = true;
+    }
+  }
+
+  setRestoreMode(isRestore);
+  setFoundUser(data);
+}
+
+setLoadingUser(false);
+setSearchDelayActive(false);
       }}
     >
       Search
@@ -1383,7 +1617,11 @@ className="
       </div>
       <button
         type="button"
-        onClick={() => setFoundUser(null)}
+        onClick={() => {
+          setRestoreMode(false);
+          setFoundUser(null)}
+        }
+        
         className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground hover:text-destructive transition"
         aria-label="Clear search result"
       >
@@ -1393,25 +1631,31 @@ className="
 
     <AlertDialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
       <AlertDialogTrigger asChild>
-        <Button className="mt-2 w-full">
-          Send Request
-        </Button>
-      </AlertDialogTrigger>
+  <Button className="mt-2 w-full">
+    {restoreMode ? "Restore Contact" : "Send Request"}
+  </Button>
+</AlertDialogTrigger>
 
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Send Friend Request</AlertDialogTitle>
-          <AlertDialogDescription>
-            Do you want to send request to {foundUser?.name || "this user"}?
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        <AlertDialogFooter>
+  <AlertDialogTitle>
+    {restoreMode ? "Restore Contact" : "Send Friend Request"}
+  </AlertDialogTitle>
+  <AlertDialogDescription>
+    {restoreMode
+      ? `Do you want to restore ${foundUser?.name || "this contact"}?`
+      : `Do you want to send request to ${foundUser?.name || "this user"}?`}
+  </AlertDialogDescription>
+</AlertDialogHeader>
+<AlertDialogFooter>
           <AlertDialogCancel className="hover:bg-red-500 hover:text-white transition-colors">
             Cancel
           </AlertDialogCancel>
 
-          <div style={requestLoading ? { cursor: "not-allowed", display: "inline-flex" } : {}}>
+          <div
+            className="flex-1"
+            style={requestLoading ? { cursor: "not-allowed" } : {}}
+          >
             <AlertDialogAction
               onClick={async (e) => {
                 e.preventDefault();
@@ -1441,6 +1685,24 @@ className="
 
                 await new Promise(resolve => setTimeout(resolve, 2500));
 
+                // 🔥 RESTORE FLOW (agar search ke time hi restoreMode true set hua tha)
+                if (restoreMode) {
+                  await supabase
+                    .from("deleted_contacts")
+                    .delete()
+                    .eq("user_email", currentUser.email)
+                    .eq("contact_email", foundUser.email);
+
+                  setRequestLoading(false);
+                  setRequestDialogOpen(false);
+                  setInfoDialog({ open: true, message: "Contact restored!" });
+                  setFoundUser(null);
+                  setSearchUID("");
+                  setRestoreMode(false);
+                  return;
+                }
+
+                // 🔥 NORMAL SEND-REQUEST FLOW
                 const { data: existingRequest1 } = await supabase
                   .from("friend_requests")
                   .select("id, status")
@@ -1490,6 +1752,7 @@ className="
                 }
               }}
               disabled={requestLoading}
+              className="w-full"
               style={requestLoading ? { opacity: 0.4, pointerEvents: "none" } : {}}
             >
               Confirm
@@ -1738,16 +2001,13 @@ return (
         <span>Active now</span>
       )}
 
+      
       {!blocked && contact.id !== "self" && (() => {
-        const friend = friends.find(
-          (f) => (f.email || f.id || "").toLowerCase().trim() === contactKey
-        );
-        // 🔥 last_seen null = online_visible OFF - kuch mat dikhao
-        if (!friend?.last_seen) return null;
-        return (
-          <span>{isOnline(friend.last_seen) ? "Active now" : "Not Active"}</span>
-        );
-      })()}
+  if (!contact.last_seen) return null;
+  return (
+    <span>{isOnline(contact.last_seen) ? "Active now" : "Not Active"}</span>
+  );
+})()}
 
       {contact.id !== "self" && preferences.muted.has(contact.id) && (
         <div className="flex items-center gap-1">
@@ -1908,32 +2168,24 @@ return (
                     const currentEmail = userData.user.email;
 
                     // Delete all messages between the two users
-                    await supabase
-                      .from("messages")
-                      .delete()
-                      .or(
-                        `and(sender_email.eq.${currentEmail},receiver_email.eq.${deleteConfirm.contactEmail}),` +
-                        `and(sender_email.eq.${deleteConfirm.contactEmail},receiver_email.eq.${currentEmail})`
-                      );
+               // 🔥 Sirf apni taraf ke messages hide karo, dusre ke messages untouched
+await supabase
+  .from("messages")
+  .update({ deleted_for_sender: true })
+  .eq("sender_email", currentEmail)
+  .eq("receiver_email", deleteConfirm.contactEmail);
 
-                    // Delete friend requests (both directions)
-                    await supabase
-                      .from("friend_requests")
-                      .delete()
-                      .match({
-                        sender_email: currentEmail,
-                        receiver_email: deleteConfirm.contactEmail,
-                        status: "accepted",
-                      });
+await supabase
+  .from("messages")
+  .update({ deleted_for_receiver: true })
+  .eq("sender_email", deleteConfirm.contactEmail)
+  .eq("receiver_email", currentEmail);
 
-                    await supabase
-                      .from("friend_requests")
-                      .delete()
-                      .match({
-                        sender_email: deleteConfirm.contactEmail,
-                        receiver_email: currentEmail,
-                        status: "accepted",
-                      });
+// 🔥 friend_requests row delete NAHI karni — sirf apni side se contact hide karo
+await supabase.from("deleted_contacts").upsert({
+  user_email: currentEmail,
+  contact_email: deleteConfirm.contactEmail,
+});
 
                     // Remove from local state
                     setAcceptedFriends((prev) =>
@@ -1959,9 +2211,12 @@ return (
       </AlertDialog>
 
 
+{/* User Footer */}
       {/* User Footer */}
-      {/* User Footer */}
-<div className="border-t p-2">
+<div 
+  className="border-t p-2"
+  style={{ paddingBottom: 'max(calc(0.5rem + env(safe-area-inset-bottom, 0px)), 1rem)' }}
+>
         <div className="flex items-center gap-3 rounded-xl p-2">
          <Avatar className="h-9 w-9">
   <AvatarImage src={user?.avatar} />
@@ -2065,6 +2320,8 @@ const ChatArea = ({
   setAllMessages,
   onSendAudio,
    onForwardTo,
+   isMobile,        
+  onBack,  
 }: {
   contact: Contact | null;
   messages: Message[];
@@ -2087,7 +2344,8 @@ const ChatArea = ({
   onReplyMessage: (messageId: string) => void;
   onForwardMessage: (messageId: string) => void;
   onClearAllChats: () => Promise<void>;
-
+  isMobile?: boolean;           
+  onBack?: () => void;    
   preferences: PreferencesType;
   setPreferences: React.Dispatch<React.SetStateAction<PreferencesType>>;
   setAllMessages: React.Dispatch<React.SetStateAction<Record<string, Message[]>>>;
@@ -2113,6 +2371,7 @@ const [imageUploading, setImageUploading] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
 const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
   const { blockUser, unblockUser, onUserBlocked, onUserUnblocked, blockedUsers, setBlockedUsers,socket } = useSocket();
+  const { theme: appTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [contactInfoOpen, setContactInfoOpen] = useState(false);
   const [bgChangeOpen, setBgChangeOpen] = useState(false);
@@ -2291,12 +2550,14 @@ useEffect(() => {
 
 }, [blockedUsers]); // 🔥 blockedUsers change hone par trigger
 // Contact switch hone pe force scroll
+// 🔥 typing dots dikhte hi auto-scroll (agar user last message ke paas hai)
 useEffect(() => {
-  isNearBottomRef.current = true;
-  setTimeout(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, 50);
-}, [contact?.id]);
+  if (isTyping && isNearBottomRef.current) {
+    setTimeout(() => {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 50);
+  }
+}, [isTyping]);
 useEffect(() => {
   if (!socket) return;
 
@@ -2707,10 +2968,8 @@ const startRecording = async () => {
               id: clientId,
               senderId: user?.email || "",
               text: `[AUDIO]${base64Audio}[/AUDIO]`,
-              time: new Date().toLocaleTimeString([], { 
-                hour: "2-digit", 
-                minute: "2-digit" 
-              }),
+              timestamp: Date.now(),
+             time: formatMessageDateTime(Date.now()),
               isOwn: true,
               status: "sent" as const,
             }],
@@ -2797,11 +3056,21 @@ const cancelRecording = () => {
   }
 
   return (
-    <div className="flex flex-1 flex-col relative pt-safe md:pt-0 pb-safe md:pb-0">
+    <div className="flex flex-1 flex-col relative">
       {/* Chat Header */}
  
-      <div className="flex items-center justify-between border-b px-2 md:px-6 py-2 md:py-3 pt-safe gap-1 md:gap-2">
+{/* Chat Header */}
+ 
+ <div 
+  className="flex items-center justify-between border-b px-6 py-3"
+  style={{ paddingTop: 'calc(0.25rem + env(safe-area-inset-top, 0px))' }}
+>
         <div className="flex items-center gap-3">
+          {isMobile && (
+            <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-muted -ml-4 shrink-0">
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+          )}
           <div className="relative">
             <button
   type="button"
@@ -2833,29 +3102,31 @@ const cancelRecording = () => {
             <div className="flex items-center gap-2">
               {/* 🔥 Show online/offline status - ONLY if NOT BLOCKED */}
     {!isBlocked && (
-                <div className="flex items-center gap-1">
-                  {contact.id === "self" ? (
-                    <>
-                      <div className="h-2 w-2 rounded-full bg-orange-500" />
-                      <p className="text-xs text-muted-foreground">Active now</p>
-                    </>
-                  ) : (() => {
-                    const friend = friends.find(f => f.id === contact.id);
-                    // 🔥 last_seen null = online_visible OFF - kuch mat dikhao
-                    if (!friend?.last_seen) return null;
-                    return (
-                      <>
-                        {isOnline(friend.last_seen) && (
-                          <div className="h-2 w-2 rounded-full bg-orange-500" />
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                          {isOnline(friend.last_seen) ? "Active now" : "Not Active"}
-                        </p>
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
+  <div className="flex items-center gap-1">
+    {contact.id === "self" ? (
+      <>
+        <div className="h-2 w-2 rounded-full bg-orange-500" />
+        <p className="text-xs text-muted-foreground">Active now</p>
+      </>
+    ) : isTyping ? (
+      <p className="text-xs font-medium text-orange-500 animate-pulse">
+        typing...
+      </p>
+    ) : (() => {
+      if (!contact?.last_seen) return null;
+      return (
+        <>
+          {isOnline(contact.last_seen) && (
+            <div className="h-2 w-2 rounded-full bg-orange-500" />
+          )}
+          <p className="text-xs text-muted-foreground">
+            {isOnline(contact.last_seen) ? "Active now" : "Not Active"}
+          </p>
+        </>
+      );
+    })()}
+  </div>
+)}
             </div>
           </div>
         </div>
@@ -2931,7 +3202,8 @@ const cancelRecording = () => {
     {/* Dropdown menu */}
 {menuOpen && (
   <div
-    className="absolute right-0 top-12 z-50"
+    className="absolute right-0 z-50"
+    style={{ top: 'calc(3rem + env(safe-area-inset-top, 0px))' }}
     onClick={(e) => e.stopPropagation()}
   >
     <div className="bg-card rounded-2xl shadow-lg w-60 py-2 border border-border">
@@ -3090,7 +3362,7 @@ const cancelRecording = () => {
 
       {/* Pinned Messages Bar */}
       {Array.from(pinnedMessages).length > 0 && (
-        <div className="border-b bg-muted/30 px-3 md:px-6 py-2">
+        <div className="border-b bg-muted/30 px-6 py-2">
           <div className="flex items-center gap-2">
             <Pin className="h-4 w-4 text-primary" />
             <span className="text-xs font-medium text-muted-foreground">
@@ -3139,8 +3411,8 @@ setTimeout(() => {
       )}
 
       {/* Messages */}
-      <ScrollArea
-className={`flex-1 px-3 md:px-6 py-4 transition-colors ${
+<ScrollArea
+className={`flex-1 w-full px-6 py-4 transition-colors ${
   bgColor === "dark" ? "bg-[#1a1a1a]" :
 
   bgColor === "blue" ? "bg-blue-50" :
@@ -3201,7 +3473,7 @@ className={`flex-1 px-3 md:px-6 py-4 transition-colors ${
 
     {/* 🔥 MESSAGE BUBBLE */}
 <div
-  className={`relative max-w-fit min-w-0 break-words rounded-2xl
+ className={`relative max-w-[70vw] sm:max-w-[60vw] min-w-0 break-words [overflow-wrap:anywhere] rounded-2xl
     ${
       // Pure emoji message - no bubble at all
 !msg.isDeleted && msg.text && isEmojiOnly(msg.text)
@@ -3370,7 +3642,7 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
 
       {/* Reply Preview Bar */}
       {replyTo && (
-        <div className="border-t border-b bg-muted/50 px-3 md:px-6 py-3">
+        <div className="border-t border-b bg-muted/50 px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
@@ -3394,7 +3666,10 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
 
       {/* Message Input */}
      {/* Message Input */}
-<div className="border-t px-3 md:px-6 py-3 md:py-4 pb-safe">
+<div 
+  className="border-t px-6 py-4"
+  style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+>
   {/* Hidden image file input */}
   <input
     ref={imageInputRef}
@@ -3412,28 +3687,28 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
     >
 <EmojiPicker
   onEmojiClick={handleEmojiClick}
-  theme={isDark ? "dark" as any : "light" as any}
+  theme={appTheme === "dark" ? Theme.DARK : Theme.LIGHT}
   width={320}
   height={400}
 />
     </div>
   )}
 
-  <div className="flex items-center gap-1 md:gap-2">
+  <div className="flex items-center gap-2">
     {/* 🖼️ Image Upload Button (was red-circled) */}
     <Button
       variant="ghost"
       size="icon"
-      className="h-9 w-9 md:h-10 md:w-10 shrink-0 rounded-lg md:rounded-xl"
+      className="h-10 w-10 shrink-0 rounded-xl"
       disabled={isBlocked || imageUploading}
       onClick={() => imageInputRef.current?.click()}
       title="Send image"
     >
-      <ImageIcon className="h-4 w-4 md:h-5 md:w-5" />
+      <ImageIcon className="h-5 w-5" />
     </Button>
 
     {/* Input + emoji picker wrapper */}
-    <div className="relative flex-1 min-w-0">
+    <div className="relative flex-1">
       <Input
         ref={inputRef}
         placeholder={
@@ -3474,7 +3749,7 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
           }
         }}
-        className={`h-10 md:h-12 rounded-lg md:rounded-xl border-none bg-muted pr-9 md:pr-10 text-sm ${
+        className={`h-12 rounded-xl border-none bg-muted pr-12 text-sm ${
           isBlockedByMe || isBlockedByThem
             ? "cursor-not-allowed opacity-50 [&::placeholder]:text-red-500"
             : isRecording
@@ -3487,14 +3762,14 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
       <Button
         variant="ghost"
         size="icon"
-        className={`absolute right-0.5 md:right-1 top-1/2 h-7 w-7 md:h-8 md:w-8 -translate-y-1/2 rounded-lg transition-colors ${
+        className={`absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg transition-colors ${
           showEmojiPicker ? "bg-primary/10 text-primary" : ""
         }`}
         onClick={() => setShowEmojiPicker((prev) => !prev)}
         disabled={isBlockedByMe || isBlockedByThem}
         title="Emoji"
       >
-        <Smile className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
+        <Smile className="h-5 w-5 text-muted-foreground" />
       </Button>
     </div>
 
@@ -3503,15 +3778,15 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
   variant="ghost"
   size="icon"
   disabled={isBlockedByMe || isBlockedByThem}
-  onClick={isRecording ? cancelRecording : startRecording}
-  className={`h-9 w-9 md:h-10 md:w-10 shrink-0 rounded-lg md:rounded-xl transition-colors ${
+  onClick={isRecording ? cancelRecording : startRecording} // 🔥 cancel karo
+  className={`h-10 w-10 shrink-0 rounded-xl transition-colors ${
     isRecording
       ? "bg-red-500 text-white hover:bg-red-600 animate-pulse"
       : ""
   }`}
   title={isRecording ? "Cancel recording" : "Voice message"}
 >
-  <Mic className="h-4 w-4 md:h-5 md:w-5" />
+  <Mic className="h-5 w-5" />
 </Button>
 
     {/* Send Button */}
@@ -3519,16 +3794,16 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
 <Button
   onClick={() => {
     if (isRecording) {
-      stopRecording();
+      stopRecording(); // 🔥 recording band karo aur send ho jaega
     } else {
       handleSend();
     }
   }}
   disabled={isBlockedByMe || isBlockedByThem}
   size="icon"
-  className="h-10 w-10 md:h-12 md:w-12 shrink-0 rounded-lg md:rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+  className="h-12 w-12 shrink-0 rounded-xl bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
 >
-  <Send className="h-4 w-4 md:h-5 md:w-5" />
+  <Send className="h-5 w-5" />
 </Button>
   </div>
 </div>
@@ -3731,8 +4006,8 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
   const isBlocked = isUserBlocked(contact, userEmail, preferences, blockedUsers);
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-      <div className="bg-card rounded-2xl p-6 w-[380px] shadow-xl border border-border">
+<div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
+      <div className="bg-card rounded-2xl p-6 w-full max-w-[380px] shadow-xl border border-border">
         
         <h2 className="text-lg font-semibold mb-4">Contact Info</h2>
         
@@ -3759,10 +4034,7 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
           {/* STATUS (ONLY if NOT BLOCKED) */}
 {/* STATUS (ONLY if NOT BLOCKED) */}
 {!isUserBlocked(contact, userEmail, preferences, blockedUsers) && (() => {
-  const friend = friends.find((f) => f.id === contact.id);
-  
-  // 🔥 Agar friend ka last_seen null hai = unhone status hide kiya hai
-  if (contact.id !== "self" && !friend?.last_seen) return null;
+  if (contact.id !== "self" && !contact?.last_seen) return null;
 
   return (
     <div className="border-t pt-4">
@@ -3770,14 +4042,13 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
         Status
       </p>
       <div className="flex items-center gap-2">
-        {(contact.id === "self" ||
-          isOnline(friends.find((f) => f.id === contact.id)?.last_seen)) && (
+        {(contact.id === "self" || isOnline(contact?.last_seen)) && (
           <div className="h-2 w-2 rounded-full bg-orange-500" />
         )}
         <span className="text-sm font-medium">
           {contact.id === "self"
             ? "Active now"
-            : isOnline(friends.find((f) => f.id === contact.id)?.last_seen)
+            : isOnline(contact?.last_seen)
             ? "Active now"
             : "Not Active"}
         </span>
@@ -4136,9 +4407,18 @@ const Chat = () => {
 const { user, isAuthenticated, isProfileComplete, isLoading, logout, updateProfile: updateAuthProfile } = useAuth();
   const { isConnected, sendMessage, sendTyping, deleteMessageForEveryone, markMessagesAsRead, onMessageReceived, onMessageEdited, onMessageDeletedForEveryone, onMessageRead, onUserTyping, onUserOnline, onUserOffline, onUserBlocked, onUserUnblocked, onPendingMessagesReceived, onSentMessagesStatusReceived, requestPendingMessages, requestSentMessagesStatus,pinMessage,onMessagePinned,onMessageIdConfirmed  } = useSocket();
   const [tick, setTick] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
   const [friends, setFriends] = useState<any[]>([]);
   const [activeContact, setActiveContact] = useState<Contact | null>(null);
   const [allMessages, setAllMessages] = useState<Record<string, Message[]>>({});
+  const [contactOrder, setContactOrder] = useState<Record<string, number>>(() => {
+  try {
+    const saved = localStorage.getItem(`contact_order_${user?.email || ""}`);
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+});
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({}); // 🔥 Track unread messages per contact
   const [contextMenu, setContextMenu] = useState<{ isOpen: boolean; position: { x: number; y: number }; messageId: string | null }>({ isOpen: false, position: { x: 0, y: 0 }, messageId: null }); // 🔥 Context menu state
   const [replyTo, setReplyTo] = useState<Message | null>(null); // 🔥 Reply to message context
@@ -4166,11 +4446,6 @@ const [preferences, setPreferences] = useState<PreferencesType>({
     read_receipts_enabled: true,
     typing_indicator: true,
   });
-
-  // Mobile responsive state
-  const [isMobile, setIsMobile] = useState(false);
-  const [showChat, setShowChat] = useState(false);
-  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
 
   const getContactKey = (contact: any) => contact?.email || contact?.uid || contact?.id || "";
   const getUserKey = () => user?.email || user?.uid || "";
@@ -4290,25 +4565,23 @@ useEffect(() => {
     }
   }
 }, [user?.email]);
-
-  // Mobile detection
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-
-
-  // Handlers for mobile navigation
-  const handleBackFromChat = () => {
-    setShowChat(false);
-    setShowSettingsDropdown(false);
+useEffect(() => {
+  const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+  checkMobile();
+  window.addEventListener('resize', checkMobile);
+  window.addEventListener('orientationchange', checkMobile);
+  return () => {
+    window.removeEventListener('resize', checkMobile);
+    window.removeEventListener('orientationchange', checkMobile);
   };
-
+}, []);
+const updateContactOrder = (contactKey: string, timestamp: number) => {
+  setContactOrder((prev) => {
+    const updated = { ...prev, [contactKey]: timestamp };
+    localStorage.setItem(`contact_order_${user?.email || ""}`, JSON.stringify(updated));
+    return updated;
+  });
+};
 // 🔥 SAVE pinned messages to localStorage whenever they change
 // Pinned messages persist useEffect
 useEffect(() => {
@@ -4323,15 +4596,29 @@ useEffect(() => {
   const unsubscribe = onMessageReceived((message: any) => {
     console.log("📨 New message received:", message);
 
-    const msgKey = `chat_messages_${user?.email || ""}`;       // 🔥
-    const unreadKey = `chat_unread_counts_${user?.email || ""}`; // 🔥
+    const msgKey = `chat_messages_${user?.email || ""}`;
+    const unreadKey = `chat_unread_counts_${user?.email || ""}`;
 
     const myKey = getUserKey();
-     if (message.senderId === myKey) return;
+    const isOwnMessage = message.senderId === myKey;
     const sender = message.senderId;
     const receiver = message.recipientId;
 
-    const conversationKey = sender === myKey ? receiver : sender;
+    // 🔥 pehle: sender === myKey ? receiver : sender
+    // ab bhi wahi logic - agar khud ka message hai (dusre device se aaya) toh receiver conversationKey hai
+    const conversationKey = isOwnMessage ? receiver : sender;
+
+    // 🔥 sirf tab restore karo jab dusre se message aaya ho
+    if (!isOwnMessage) {
+      supabase
+        .from("deleted_contacts")
+        .delete()
+        .eq("user_email", myKey)
+        .eq("contact_email", sender)
+        .then(({ error }) => {
+          if (error) console.error("Failed to restore deleted contact:", error);
+        });
+    }
 
     let parsedContent: any = null;
     if (typeof message.content === "string") {
@@ -4352,7 +4639,7 @@ useEffect(() => {
               : msg
           ) || [],
         };
-        localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
+        localStorage.setItem(msgKey, JSON.stringify(updated));
         return updated;
       });
       return;
@@ -4369,30 +4656,34 @@ useEffect(() => {
       id: message.id,
       senderId: message.senderId,
       text: parsedContent?.text || message.content,
+      timestamp: message.timestamp ? new Date(message.timestamp).getTime() : Date.now(),
       edited: message.edited || false,
       replyTo: parsedContent?.replyTo || message.replyTo || null,
       time: message.timestamp
-        ? new Date(message.timestamp).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-      isOwn: false,
+  ? formatMessageDateTime(message.timestamp)
+  : formatMessageDateTime(new Date()),
+      isOwn: isOwnMessage,
+      status: isOwnMessage ? "sent" : undefined,
     };
 
     setAllMessages((prev) => {
       const conversationMessages = prev[conversationKey] || [];
-      const existingIndex = conversationMessages.findIndex((m: any) => m.id === payload.id);
+      // 🔥 id ke alawa clientId se bhi dedupe check karo (taki apna hi optimistic msg duplicate na ho)
+      const existingIndex = conversationMessages.findIndex(
+        (m: any) => m.id === payload.id || (message.clientId && m.id === message.clientId)
+      );
 
       let updated;
       if (existingIndex !== -1) {
         const existing = conversationMessages[existingIndex];
         if (payload.edited && existing.text !== payload.text) {
           const newMessages = [...conversationMessages];
-          newMessages[existingIndex] = { ...existing, text: payload.text, edited: true };
+          newMessages[existingIndex] = { ...existing, id: payload.id, text: payload.text, edited: true };
+          updated = { ...prev, [conversationKey]: newMessages };
+        } else if (existing.id !== payload.id) {
+          // 🔥 temp clientId ko real server id se replace karo
+          const newMessages = [...conversationMessages];
+          newMessages[existingIndex] = { ...existing, id: payload.id };
           updated = { ...prev, [conversationKey]: newMessages };
         } else {
           return prev;
@@ -4404,40 +4695,44 @@ useEffect(() => {
         };
       }
 
-      localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
+      localStorage.setItem(msgKey, JSON.stringify(updated));
       return updated;
     });
+    updateContactOrder(conversationKey, payload.timestamp);
 
-    setUnreadCounts((prev) => {
-      if (
-        (activeContact && getContactKey(activeContact) === conversationKey) ||
-        payload.status === "read"
-      ) {
-        return prev;
-      }
+    // 🔥 unread count sirf dusre se aaye message pe badhao, apne khud ke message pe nahi
+    if (!isOwnMessage) {
+      setUnreadCounts((prev) => {
+        if (
+          (activeContact && getContactKey(activeContact) === conversationKey) ||
+          payload.status === "read"
+        ) {
+          return prev;
+        }
 
-      if (preferences.muted.has(conversationKey)) return prev;
+        if (preferences.muted.has(conversationKey)) return prev;
 
-      const updated = {
-        ...prev,
-        [conversationKey]: (prev[conversationKey] || 0) + 1,
-      };
-      localStorage.setItem(unreadKey, JSON.stringify(updated)); // 🔥
-      return updated;
-    });
+        const updated = {
+          ...prev,
+          [conversationKey]: (prev[conversationKey] || 0) + 1,
+        };
+        localStorage.setItem(unreadKey, JSON.stringify(updated));
+        return updated;
+      });
+    }
   });
 
   return () => {
     if (typeof unsubscribe === "function") unsubscribe();
   };
-}, [onMessageReceived, activeContact, preferences.muted]); // 🔥 preferences.muted added
+}, [onMessageReceived, activeContact, preferences.muted]);
   // 🔌 Request sent messages status when socket connects
-  useEffect(() => {
-    if (isConnected && requestSentMessagesStatus) {
-      console.log("[v0] Socket connected, requesting sent messages status");
-      requestSentMessagesStatus();
-    }
-  }, [isConnected, requestSentMessagesStatus]);
+ useEffect(() => {
+  if (isConnected && requestPendingMessages) {
+    console.log("[v0] Socket connected, requesting pending messages");
+    requestPendingMessages();
+  }
+}, [isConnected, requestPendingMessages]);
 
   // 🔌 Periodically sync sent messages status (every 5 seconds if connected)
 useEffect(() => {
@@ -4480,16 +4775,11 @@ useEffect(() => {
         id: message.id,
         senderId: message.senderId,
         text: parsedContent?.text || message.content,
+        timestamp: message.timestamp ? new Date(message.timestamp).getTime() : Date.now(),
         replyTo: parsedContent?.replyTo || null,
-        time: message.timestamp
-          ? new Date(message.timestamp).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : new Date().toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
+       time: message.timestamp
+  ? formatMessageDateTime(message.timestamp)
+  : formatMessageDateTime(new Date()),
         isOwn: false,
         status: message.status,
       };
@@ -4508,6 +4798,7 @@ useEffect(() => {
         localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
         return updated;
       });
+      updateContactOrder(conversationKey, payload.timestamp); 
 
       setUnreadCounts((prev) => {
         if (
@@ -4867,118 +5158,116 @@ useEffect(() => {
     const userId = data.user?.id;
     if (!userId) return;
 
-    // 🔥 FIX: Always include Z for UTC
-    const now = new Date().toISOString(); // Already has Z
+    const now = new Date().toISOString();
 
-    if (preferences.online_visible === false) {
-      await supabase.from("profiles").update({ last_seen: null }).eq("id", userId);
-      return;
-    }
-
+    // ✅ last_seen hamesha real time set karo — chhupana hai to filtering read-time pe karo
     await supabase.from("profiles").update({ last_seen: now }).eq("id", userId);
   };
 
   updateLastSeen();
-  const interval = setInterval(updateLastSeen, 15000); // 🔥 5s se 30s karo - server already handles it
+  const interval = setInterval(updateLastSeen, 15000);
   return () => clearInterval(interval);
-}, [preferences.online_visible]); // 🔥 dependency add ki
+}, []); // 🔥 online_visible dependency hata do// 🔥 dependency add ki
 useEffect(() => {
-  const loadMessagesFromDB = async () => {
-    if (!user?.email) return;
+      const loadMessagesFromDB = async () => {
+        if (!user?.email) return;
 
-    const msgKey = `chat_messages_${user.email}`;
-    const unreadKey = `chat_unread_counts_${user.email}`;
+        const msgKey = `chat_messages_${user.email}`;
+        const unreadKey = `chat_unread_counts_${user.email}`;
 
-    try {
-      const { data: msgs, error } = await supabase
-        .from("messages")
-        .select("*")
-        .or(`sender_email.eq.${user.email},receiver_email.eq.${user.email}`)
-        .order("created_at", { ascending: true });
+        try {
+          const { data: msgs, error } = await supabase
+            .from("messages")
+            .select("*")
+            .or(`sender_email.eq.${user.email},receiver_email.eq.${user.email}`)
+            .order("created_at", { ascending: true });
 
-      if (error) {
-        console.error("Failed to fetch messages from DB:", error);
-        const stored = localStorage.getItem(msgKey);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const processed = Object.keys(parsed).reduce((acc, key) => {
-            acc[key] = parsed[key].map((msg: any) => ({
-              ...msg,
-              readAt: msg.readAt ? new Date(msg.readAt) : undefined,
-            }));
-            return acc;
-          }, {} as Record<string, Message[]>);
-          setAllMessages(processed);
-        }
-        return;
-      }
-
-      if (msgs && msgs.length > 0) {
-        const organized: Record<string, Message[]> = {};
-
-        msgs.forEach((msg: any) => {
-          const isSelfMessage = msg.sender_email === msg.receiver_email;
-
-          const conversationKey = isSelfMessage
-            ? "self"
-            : msg.sender_email === user.email
-            ? msg.receiver_email
-            : msg.sender_email;
-
-          if (!organized[conversationKey]) {
-            organized[conversationKey] = [];
-          }
-
-          let parsedContent: any = null;
-          if (typeof msg.content === "string") {
-            try {
-              parsedContent = JSON.parse(msg.content);
-            } catch {
-              parsedContent = { text: msg.content };
+          if (error) {
+            console.error("Failed to fetch messages from DB:", error);
+            const stored = localStorage.getItem(msgKey);
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              const processed = Object.keys(parsed).reduce((acc, key) => {
+                acc[key] = parsed[key].map((msg: any) => ({
+                  ...msg,
+                  readAt: msg.readAt ? new Date(msg.readAt) : undefined,
+                }));
+                return acc;
+              }, {} as Record<string, Message[]>);
+              setAllMessages(processed);
             }
+            return;
           }
 
-          organized[conversationKey].push({
-            id: msg.id,
-            senderId: msg.sender_email,
-            text: msg.is_deleted
-              ? "message deleted"
-              : (parsedContent?.text || msg.content || ""),
-            replyTo: parsedContent?.replyTo || null,
-            time: new Date(msg.created_at).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            isOwn: msg.sender_email === user.email,
-            status: msg.status || "sent",
-            edited: msg.edited || false,
-            isDeleted: msg.is_deleted || false,
-            readAt: msg.read_at ? new Date(msg.read_at) : undefined,
-          });
-        });
+          if (msgs && msgs.length > 0) {
+            const organized: Record<string, Message[]> = {};
 
-        setAllMessages(organized);
-        localStorage.setItem(msgKey, JSON.stringify(organized));
-        console.log("✅ Messages loaded from Supabase DB");
-      } else {
-        console.log("📭 No messages found in DB");
-      }
-    } catch (err) {
-      console.error("Error loading messages:", err);
-    }
+            msgs.forEach((msg: any) => {
+              // 🔥 Agar maine sender hote hue delete kiya tha, toh mujhe mat dikhao
+              if (msg.sender_email === user.email && msg.deleted_for_sender) return;
+              // 🔥 Agar maine receiver hote hue delete kiya tha, toh mujhe mat dikhao
+              if (msg.receiver_email === user.email && msg.deleted_for_receiver) return;
 
-    const storedUnread = localStorage.getItem(unreadKey);
-    if (storedUnread) {
-      try {
-        setUnreadCounts(JSON.parse(storedUnread));
-      } catch (error) {
-        console.error("Failed to parse unread counts:", error);
-      }
-    }
-  };
+              const isSelfMessage = msg.sender_email === msg.receiver_email;
 
-  loadMessagesFromDB();
-}, [user?.email]); // 🔥 user?.email dependency - jab user load ho tab fetch karo
+              const conversationKey = isSelfMessage
+                ? "self"
+                : msg.sender_email === user.email
+                ? msg.receiver_email
+                : msg.sender_email;
+
+              if (!organized[conversationKey]) {
+                organized[conversationKey] = [];
+              }
+
+              let parsedContent: any = null;
+              if (typeof msg.content === "string") {
+                try {
+                  parsedContent = JSON.parse(msg.content);
+                } catch {
+                  parsedContent = { text: msg.content };
+                }
+              }
+
+              organized[conversationKey].push({
+                id: msg.id,
+                senderId: msg.sender_email,
+                text: msg.is_deleted
+                  ? "message deleted"
+                  : (parsedContent?.text || msg.content || ""),
+                timestamp: new Date(msg.created_at).getTime(),  
+                replyTo: parsedContent?.replyTo || null,
+                time: formatMessageDateTime(msg.created_at),
+                isOwn: msg.sender_email === user.email,
+                status: msg.status || "sent",
+                edited: msg.edited || false,
+                isDeleted: msg.is_deleted || false,
+                readAt: msg.read_at ? new Date(msg.read_at) : undefined,
+              });
+            });
+
+            setAllMessages(organized);
+            localStorage.setItem(msgKey, JSON.stringify(organized));
+            console.log("✅ Messages loaded from Supabase DB");
+          } else {
+            console.log("📭 No messages found in DB");
+          }
+        } catch (err) {
+          console.error("Error loading messages:", err);
+        }
+
+        const storedUnread = localStorage.getItem(unreadKey);
+        if (storedUnread) {
+          try {
+            setUnreadCounts(JSON.parse(storedUnread));
+          } catch (error) {
+            console.error("Failed to parse unread counts:", error);
+          }
+        }
+      };
+
+      loadMessagesFromDB();
+    }, [user?.email]); // 🔥 user?.email dependency - jab user load ho tab fetch karo
 
 // 🔥 Load user preferences from database
 useEffect(() => {
@@ -5051,8 +5340,8 @@ useEffect(() => {
     const unreadKey = `chat_unread_counts_${user?.email || ""}`;
 
     const unreadMessageIds = messages
-      .filter((msg) => !msg.isOwn && msg.status !== "read" && !msg.isDeleted)
-      .map((msg) => msg.id);
+  .filter((msg) => !msg.isOwn && msg.status !== "read" && !msg.isDeleted && !msg.id.startsWith("m")) // 🔥 temp client IDs skip karo
+  .map((msg) => msg.id);
 
     if (unreadMessageIds.length > 0) {
       const readTimestamp = new Date();
@@ -5109,6 +5398,23 @@ const updateProfile = async (data: { name: string; email: string; avatar: string
     avatar: data.avatar,
   });
 };
+const isRealMobileDevice = () => {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+
+  const ua = navigator.userAgent || navigator.vendor || (window as any).opera || "";
+
+  // 🔥 User-agent based detection - Android, iOS, aur baaki mobile OS cover karta hai
+  const mobileRegex = /android|iphone|ipad|ipod|iemobile|blackberry|bada|windows phone|mobile/i;
+  const isUAMobile = mobileRegex.test(ua);
+
+  // 🔥 Touch capability check - extra safety, kuch edge-case devices ke liye
+  const isTouchDevice =
+    "ontouchstart" in window ||
+    navigator.maxTouchPoints > 0;
+
+  // 🔥 Combine both - agar UA mobile bataye YA touch + chhoti/medium width ho, toh mobile maano
+  return isUAMobile || (isTouchDevice && window.innerWidth <= 1024);
+};
 const handleForwardTo = (targetContact: any, text: string) => {
   const contactKey = targetContact.id === "self"
     ? "self"
@@ -5127,7 +5433,8 @@ const handleForwardTo = (targetContact: any, text: string) => {
     id: `m${Date.now()}`,
     senderId: getUserKey(),
     text: forwardText,
-    time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    timestamp: Date.now(), 
+    time: formatMessageDateTime(Date.now()),
     isOwn: true,
     status: "sent" as const,
   };
@@ -5142,6 +5449,7 @@ const handleForwardTo = (targetContact: any, text: string) => {
     localStorage.setItem(msgKey, JSON.stringify(updated));
     return updated;
   });
+  updateContactOrder(contactKey, newMsg.timestamp); 
 
   if (targetContact.id !== "self") {
     sendMessage(
@@ -5154,6 +5462,9 @@ const handleForwardTo = (targetContact: any, text: string) => {
   }
 };
 const handleSelectContact = (contact: Contact) => {
+   if (isRealMobileDevice()) {
+    window.history.pushState({ chatOpen: true }, "", window.location.pathname);
+  }
   if (activeContact) {
     const prevContactKey = getContactKey(activeContact);
     setLocalTyping((prev) => ({ ...prev, [prevContactKey]: false }));
@@ -5189,12 +5500,6 @@ const handleSelectContact = (contact: Contact) => {
       return updated;
     });
   }
-
-  // Mobile: show chat when contact is selected
-  if (isMobile) {
-    setShowChat(true);
-    setShowSettingsDropdown(false);
-  }
 };
 
   // 🔥 Message action handlers
@@ -5203,22 +5508,28 @@ const handleDeleteForMe = async (messageId: string) => {
   if (!activeContact) return;
   const contactKey = getContactKey(activeContact);
 
-  const msgKey = `chat_messages_${user?.email || ""}`;    // 🔥
-  const pinnedKey = `pinned_messages_${user?.email || ""}`; // 🔥
+  const msgKey = `chat_messages_${user?.email || ""}`;
+  const pinnedKey = `pinned_messages_${user?.email || ""}`;
 
   const { data: userData } = await supabase.auth.getUser();
-  if (userData.user?.email) {
-    await supabase
-      .from("messages")
-      .delete()
-      .eq("id", messageId)
-      .eq("sender_email", userData.user.email);
+  const myEmail = (userData.user?.email || "").toLowerCase().trim();
 
-    await supabase
+  if (myEmail) {
+    // 🔥 Agar main SENDER hoon - sirf sender-side flag set karo (row delete NAHI karo)
+    const { error: err1 } = await supabase
       .from("messages")
-      .update({ is_deleted_for_sender: true })
+      .update({ deleted_for_sender: true })
       .eq("id", messageId)
-      .eq("receiver_email", userData.user.email);
+      .ilike("sender_email", myEmail);
+    if (err1) console.error("[v0] delete_for_sender failed:", err1);
+
+    // 🔥 Agar main RECEIVER hoon - sirf receiver-side flag set karo (correct column name)
+    const { error: err2 } = await supabase
+      .from("messages")
+      .update({ deleted_for_receiver: true })
+      .eq("id", messageId)
+      .ilike("receiver_email", myEmail);
+    if (err2) console.error("[v0] delete_for_receiver failed:", err2);
   }
 
   setAllMessages((prev) => {
@@ -5226,7 +5537,7 @@ const handleDeleteForMe = async (messageId: string) => {
       ...prev,
       [contactKey]: prev[contactKey]?.filter((msg) => msg.id !== messageId) || [],
     };
-    localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
+    localStorage.setItem(msgKey, JSON.stringify(updated));
     return updated;
   });
 
@@ -5235,18 +5546,17 @@ const handleDeleteForMe = async (messageId: string) => {
     const contactPinned = newMap.get(contactKey) || new Set();
     contactPinned.delete(messageId);
     newMap.set(contactKey, contactPinned);
-    localStorage.setItem(pinnedKey, JSON.stringify(Array.from(newMap.entries()))); // 🔥
+    localStorage.setItem(pinnedKey, JSON.stringify(Array.from(newMap.entries())));
     if (user?.email) {
       savePrefs(user.email, "pinned_messages", Array.from(newMap.entries()));
     }
     return newMap;
   });
 };
-const handleDeleteForEveryone = (messageId: string) => {
+const handleDeleteForEveryone = async (messageId: string) => {
   if (!activeContact) return;
   const contactKey = getContactKey(activeContact);
-
-  const msgKey = `chat_messages_${user?.email || ""}`; // 🔥
+  const msgKey = `chat_messages_${user?.email || ""}`;
 
   setAllMessages((prev) => {
     const updated = {
@@ -5257,9 +5567,16 @@ const handleDeleteForEveryone = (messageId: string) => {
           : msg
       ) || [],
     };
-    localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
+    localStorage.setItem(msgKey, JSON.stringify(updated));
     return updated;
   });
+
+  // 🔥 YE MISSING THA
+  const { error } = await supabase
+    .from("messages")
+    .update({ is_deleted: true, content: JSON.stringify({ text: "message deleted" }) })
+    .eq("id", messageId);
+  if (error) console.error("delete-for-everyone DB update failed:", error);
 
   const recipient = activeContact?.email || activeContact?.uid;
   if (recipient) {
@@ -5400,7 +5717,8 @@ const handleSend = async  (text: string, replyToMsg?: Message | null) => {
     id: `m${Date.now()}`,
     senderId: getUserKey(),
     text: payload.text,
-    time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    timestamp: Date.now(), 
+    time: formatMessageDateTime(Date.now()),
     isOwn: true,
     replyTo: payload.replyTo || undefined,
     status: isSelfChat ? "read" as const : "sent" as const,
@@ -5415,6 +5733,7 @@ const handleSend = async  (text: string, replyToMsg?: Message | null) => {
     localStorage.setItem(msgKey, JSON.stringify(updated));
     return updated;
   });
+  updateContactOrder(contactKey, newMsg.timestamp);
 
 if (isSelfChat) {
     const { data: authData } = await supabase.auth.getUser();
@@ -5464,6 +5783,19 @@ navigate("/auth");
 
 };
 useEffect(() => {
+  const handlePopState = (event: PopStateEvent) => {
+    if (activeContact) {
+      setActiveContact(null);
+      if (isRealMobileDevice()) {
+        window.history.pushState({ chatOpen: false }, "", window.location.pathname);
+      }
+    }
+  };
+
+  window.addEventListener("popstate", handlePopState);
+  return () => window.removeEventListener("popstate", handlePopState);
+}, [activeContact]);
+useEffect(() => {
   if (!activeContact) return;
 
   const updated = friends.find(f => f.id === activeContact.id);
@@ -5493,142 +5825,87 @@ useEffect(() => {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background pt-safe md:pt-0 pb-safe md:pb-0">
+    <div className="flex h-screen overflow-hidden bg-background">
       
-      {/* Desktop: Left Sidebar | Mobile: Hidden when chat is open */}
-      {(!isMobile || !showChat) && (
-        <ChatSidebar
-  activeContact={activeContact}
-  onSelect={handleSelectContact}
-  filter={filter}
-  setFilter={setFilter}
-  searchQuery={searchQuery}
-  setSearchQuery={setSearchQuery}
-  user={user}
-  uid={uid}
-  onLogout={handleLogout}
-  dialogOpen={dialogOpen}
-  setFriends={setFriends}
-  setDialogOpen={setDialogOpen}
-  logoutLoading={logoutLoading}
-  friends={friends}
-  previewImage={previewImage}
-  previewTitle={previewTitle}
-  setPreviewImage={setPreviewImage}
-  setPreviewTitle={setPreviewTitle}
-  typingStatus={typingStatus}
-  unreadCounts={unreadCounts}
-    allMessages={allMessages} 
-preferences={preferences}
-  setPreferences={setPreferences}
-  onSettingsOpen={() => setSettingsOpen(true)}
-/>
-      )}
-
-{/* Desktop: Right Chat Area | Mobile: Full screen when chat is open */}
-{(!isMobile || showChat) && (
-<div className={`flex-1 flex flex-col relative ${isMobile && showChat ? "w-full" : ""}`}>
-  {/* Mobile: Back button and settings dropdown */}
-  {isMobile && showChat && activeContact && (
-    <div className="flex items-center gap-2 p-2 border-b border-border bg-background pt-safe">
-      <button
-        onClick={handleBackFromChat}
-        className="flex-shrink-0 p-1 rounded-lg hover:bg-muted transition-colors"
-        aria-label="Back to contacts"
-      >
-        <ArrowLeft size={20} className="text-foreground" />
-      </button>
-      
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold truncate">{activeContact.name}</p>
-      </div>
-      
-      {/* 3-dot menu dropdown */}
-      <div className="relative">
-        <button
-          onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
-          className="p-2 rounded-lg hover:bg-muted transition-colors"
-          aria-label="Settings menu"
-        >
-          <Menu size={20} className="text-foreground" />
-        </button>
-        
-        {showSettingsDropdown && (
-          <div className="absolute right-0 top-full mt-2 w-48 bg-card border border-border rounded-lg shadow-lg z-50">
-            <button
-              onClick={() => {
-                setSettingsOpen(true);
-                setShowSettingsDropdown(false);
-              }}
-              className="w-full text-left px-4 py-2 hover:bg-muted rounded-t-lg transition-colors flex items-center gap-2 text-sm"
-            >
-              <SettingsIcon size={16} />
-              Settings
-            </button>
-            <button
-              onClick={() => {
-                setDialogOpen(true);
-                setShowSettingsDropdown(false);
-              }}
-              className="w-full text-left px-4 py-2 hover:bg-muted rounded-b-lg transition-colors flex items-center gap-2 text-sm text-destructive"
-            >
-              <LogOut size={16} />
-              Logout
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  )}
-
-<ChatArea
-  contact={activeContact}
-  messages={currentMessages}
-  onSend={handleSend}
-  onTyping={handleTyping}
-  isTyping={activeContact ? !!typingStatus[getContactKey(activeContact)] : false}
-  user={user}
-  tick={tick}
-  friends={friends}
-  preferences={preferences}
-  setPreferences={setPreferences}  
-  setPreviewImage={setPreviewImage}
-  setPreviewTitle={setPreviewTitle}
-  contextMenu={contextMenu}
-  setContextMenu={setContextMenu}
-  pinnedMessages={activeContact ? (pinnedMessages.get(getContactKey(activeContact)) || new Set()) : new Set()}
-  onDeleteForMe={handleDeleteForMe}
-  onDeleteForEveryone={handleDeleteForEveryone}
-  onPinMessage={handlePinMessage}
-  onReplyMessage={handleReplyMessage}
-  onForwardMessage={handleForwardMessage}
-  onClearAllChats={handleClearAllChats}
-  setAllMessages={setAllMessages}
-    onForwardTo={handleForwardTo}
-onSendAudio={(audioUrl: string, clientId: string) => {
-  if (!activeContact) return;
-  const contactKey = getContactKey(activeContact);
-  const conversationId = buildConversationId(getUserKey(), contactKey);
-  
-  const msgKey = `chat_messages_${user?.email || ""}`; // 🔥
-
-  setAllMessages(prev => {
-    const updated = {
-      ...prev,
-      [contactKey]: (prev[contactKey] || []).map(m =>
-        m.id === clientId ? { ...m, text: audioUrl } : m
-      ),
-    };
-    localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
-    return updated;
-  });
-
-  sendMessage(conversationId, audioUrl, contactKey, clientId, undefined);
-}}
-/>
-</div>
+{(!isMobile || !activeContact) && (
+  <ChatSidebar
+    activeContact={activeContact}
+    onSelect={handleSelectContact}
+    filter={filter}
+    setFilter={setFilter}
+    searchQuery={searchQuery}
+    setSearchQuery={setSearchQuery}
+    user={user}
+    uid={uid}
+    contactOrder={contactOrder}
+    onLogout={handleLogout}
+    dialogOpen={dialogOpen}
+    setFriends={setFriends}
+    setDialogOpen={setDialogOpen}
+    logoutLoading={logoutLoading}
+    friends={friends}
+    previewImage={previewImage}
+    previewTitle={previewTitle}
+    setPreviewImage={setPreviewImage}
+    setPreviewTitle={setPreviewTitle}
+    typingStatus={typingStatus}
+    unreadCounts={unreadCounts}
+    allMessages={allMessages}
+    preferences={preferences}
+    setPreferences={setPreferences}
+    onSettingsOpen={() => setSettingsOpen(true)}
+  />
 )}
 
+{(!isMobile || activeContact) && (
+  <ChatArea
+    contact={activeContact}
+    messages={currentMessages}
+    onSend={handleSend}
+    onTyping={handleTyping}
+    isTyping={activeContact ? !!typingStatus[getContactKey(activeContact)] : false}
+    user={user}
+    tick={tick}
+    friends={friends}
+    preferences={preferences}
+    setPreferences={setPreferences}
+    setPreviewImage={setPreviewImage}
+    setPreviewTitle={setPreviewTitle}
+    contextMenu={contextMenu}
+    setContextMenu={setContextMenu}
+    pinnedMessages={activeContact ? (pinnedMessages.get(getContactKey(activeContact)) || new Set()) : new Set()}
+    onDeleteForMe={handleDeleteForMe}
+    onDeleteForEveryone={handleDeleteForEveryone}
+    onPinMessage={handlePinMessage}
+    onReplyMessage={handleReplyMessage}
+    onForwardMessage={handleForwardMessage}
+    onClearAllChats={handleClearAllChats}
+    setAllMessages={setAllMessages}
+    onForwardTo={handleForwardTo}
+    isMobile={isMobile}
+    onBack={() => setActiveContact(null)}
+    onSendAudio={(audioUrl: string, clientId: string) => {
+      if (!activeContact) return;
+      const contactKey = getContactKey(activeContact);
+      const conversationId = buildConversationId(getUserKey(), contactKey);
+
+      const msgKey = `chat_messages_${user?.email || ""}`;
+
+      setAllMessages(prev => {
+        const updated = {
+          ...prev,
+          [contactKey]: (prev[contactKey] || []).map(m =>
+            m.id === clientId ? { ...m, text: audioUrl } : m
+          ),
+        };
+        localStorage.setItem(msgKey, JSON.stringify(updated));
+        return updated;
+      });
+
+      sendMessage(conversationId, audioUrl, contactKey, clientId, undefined);
+    }}
+  />
+)}
   <SettingsModal
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}

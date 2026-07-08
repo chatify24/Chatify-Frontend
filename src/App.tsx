@@ -8,7 +8,10 @@ import { AuthProvider } from "@/lib/auth-context";
 import { SocketProvider } from "@/lib/socket-context";
 import { ThemeProvider } from "@/lib/theme-context";
 import { ThemeToggle } from "@/components/ThemeToggle";
-
+import { getVersion } from '@tauri-apps/api/app';
+import { platform } from '@tauri-apps/plugin-os';
+import {useEffect } from "react";
+import UpdateBanner from "@/components/UpdateBanner";
 import NoInternet from "@/components/NoInternet";
 import SplashScreen from "./pages/SplashScreen";
 import Auth from "./pages/Auth";
@@ -24,68 +27,57 @@ const isTauriApp =
   typeof window !== "undefined" &&
   "__TAURI_INTERNALS__" in window;
 
-// ✅ Hover-to-reveal Close Button (only in Tauri)
-function TauriCloseButton() {
-  const [hovered, setHovered] = useState(false);
-
-  const handleClose = async () => {
-    try {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      await getCurrentWindow().close();
-    } catch (e) {
-      console.error("Failed to close window:", e);
-    }
-  };
-
-  return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: "50%",
-        transform: "translateX(-50%)",
-        width: "120px",
-        height: "40px",       // ✅ thoda bada hover zone
-        zIndex: 99999,        // ✅ sabse upar
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "center",
-        pointerEvents: "auto", // ✅ explicitly enable
-      }}
-    >
-      <button
-        onClick={handleClose}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "6px",
-          padding: "6px 18px",
-          background: "#ef4444",
-          color: "white",
-          border: "none",
-          borderRadius: "0 0 12px 12px",
-          cursor: "pointer",
-          fontSize: "13px",
-          fontWeight: 600,
-          boxShadow: "0 4px 12px rgba(239,68,68,0.5)",
-          transform: hovered ? "translateY(0)" : "translateY(-100%)",
-          transition: "transform 0.2s ease",
-          pointerEvents: "auto", // ✅ yeh key fix hai
-          zIndex: 99999,
-        }}
-      >
-        ✕ Close
-      </button>
-    </div>
-  );
-}
-
 function AppContent() {
   const location = useLocation();
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isDesktop, setIsDesktop] = useState(false);
+ const [updateInfo, setUpdateInfo] = useState({
+  available: false,
+  newVersion: "",
+  apkUrl: "",
+});
 
+useEffect(() => {
+  const checkForAndroidUpdate = async () => {
+    try {
+      const currentPlatform = await platform();
+      if (currentPlatform !== "android") return;
+
+      const currentVersion = await getVersion();
+
+      const res = await fetch("https://chatify-backend-mrlh.onrender.com/app-version");
+      const data = await res.json();
+
+      if (data.version !== currentVersion) {
+        setUpdateInfo({
+          available: true,
+          newVersion: data.version,
+          apkUrl: data.apk_url,
+        });
+      }
+    } catch (err) {
+      console.error("Update check failed:", err);
+    }
+  };
+
+  checkForAndroidUpdate();
+}, []);
+
+// 👇 Ye naya useEffect add karo
+useEffect(() => {
+  const checkPlatform = async () => {
+    try {
+      const currentPlatform = await platform();
+      setIsDesktop(currentPlatform !== "android" && currentPlatform !== "ios");
+    } catch (err) {
+      console.error("Platform check failed:", err);
+    }
+  };
+
+  if (isTauriApp) {
+    checkPlatform();
+  }
+}, []);
   const showThemeToggle =
     location.pathname !== "/chat" &&
     location.pathname !== "/settings" &&
@@ -93,8 +85,11 @@ function AppContent() {
 
   return (
     <>
-      {/* ✅ Close button sirf Tauri mein dikhega */}
-      {isTauriApp && <TauriCloseButton />}
+       <UpdateBanner
+      updateInfo={updateInfo}
+      onDismiss={() => setUpdateInfo((prev) => ({ ...prev, available: false }))}
+    />
+      
 
       {showThemeToggle && <ThemeToggle />}
 
@@ -166,8 +161,9 @@ const App = () => {
     );
   }
 
-  const [splashDone, setSplashDone] = useState(false);
+const [splashDone, setSplashDone] = useState(false);
   const [splashKey, setSplashKey] = useState(0);
+ 
 
   if (!splashDone) {
     return (
