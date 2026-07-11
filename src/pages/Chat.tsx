@@ -2506,6 +2506,20 @@ useEffect(() => {
   });
   return () => observer.disconnect();
 }, []);
+
+// 🔥 YE NAYA ADD KARO
+useEffect(() => {
+  if (!window.visualViewport) return;
+  const setHeight = () => {
+    document.documentElement.style.setProperty(
+      '--app-height',
+      `${window.visualViewport.height}px`
+    );
+  };
+  setHeight();
+  window.visualViewport.addEventListener('resize', setHeight);
+  return () => window.visualViewport.removeEventListener('resize', setHeight);
+}, []);
 useEffect(() => {
   const fetchBio = async () => {
     if (!contact) {
@@ -3760,17 +3774,21 @@ className={`flex items-center gap-2 mt-1 text-[10px] justify-start font-medium $
 
       {/* 😊 Emoji Button (was red-circled) */}
       <Button
-        variant="ghost"
-        size="icon"
-        className={`absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg transition-colors ${
-          showEmojiPicker ? "bg-primary/10 text-primary" : ""
-        }`}
-        onClick={() => setShowEmojiPicker((prev) => !prev)}
-        disabled={isBlockedByMe || isBlockedByThem}
-        title="Emoji"
-      >
-        <Smile className="h-5 w-5 text-muted-foreground" />
-      </Button>
+  variant="ghost"
+  size="icon"
+  className={`absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg transition-colors ${
+    showEmojiPicker ? "bg-primary/10 text-primary" : ""
+  }`}
+  onMouseDown={(e) => e.preventDefault()}
+  onClick={() => {
+    setShowEmojiPicker((prev) => !prev);
+    inputRef.current?.blur();
+  }}
+  disabled={isBlockedByMe || isBlockedByThem}
+  title="Emoji"
+>
+  <Smile className="h-5 w-5 text-muted-foreground" />
+</Button>
     </div>
 
     {/* 🎤 Mic Button (was red-circled) */}
@@ -5825,7 +5843,7 @@ useEffect(() => {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+   <div className="flex overflow-hidden bg-background app-height">
       
 {(!isMobile || !activeContact) && (
   <ChatSidebar

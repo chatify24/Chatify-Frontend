@@ -28,7 +28,7 @@ export default function Welcome() {
   setTimeout(() => {
     // Real download trigger
     const link = document.createElement('a');
-    link.href = 'https://github.com/chatify24/Chatify/releases/download/v1.3.6/Chatify_1.3.6_x64-setup.exe';
+    link.href = 'https://github.com/chatify24/Chatify/releases/download/v1.3.8/Chatify_1.3.8_x64-setup.exe';
     link.download = 'Chatify.exe';
     document.body.appendChild(link);
     link.click();
@@ -45,7 +45,7 @@ export default function Welcome() {
   setIsDownloading(true);
   setTimeout(() => {
     const link = document.createElement('a');
-    link.href = 'https://github.com/chatify24/chatify_android/releases/download/v1.3.6/Chatify.apk';
+    link.href = 'https://github.com/chatify24/chatify_android/releases/download/v1.3.8/Chatify.apk';
     link.download = 'Chatify.apk';
     document.body.appendChild(link);
     link.click();

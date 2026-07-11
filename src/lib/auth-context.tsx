@@ -71,6 +71,24 @@ useEffect(() => {
   };
 
   getSession();
+
+  // 🔥 NEW: Real-time auth state listener - logout ke baad session ko turant sync karega
+  const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+    console.log("[auth] state changed:", event);
+
+    if (event === "SIGNED_OUT" || !session) {
+      setUser(null);
+      setIsAuthenticated(false);
+    }
+
+    if (event === "SIGNED_IN" && session?.user) {
+      // Optional: agar future me kisi aur tab/device se login ho to yaha sync ho jayega
+    }
+  });
+
+  return () => {
+    listener.subscription.unsubscribe();
+  };
 }, []);
 useEffect(() => {
   const interval = setInterval(async () => {
@@ -210,23 +228,36 @@ const login = async (email: string, password: string): Promise<AuthResult> => {
   return { success: true, profileComplete: !!profile?.name };
 };
   // 🚪 LOGOUT
-  const logout = async () => {
-    const { data } = await supabase.auth.getUser();
+const logout = async () => {
+  const { data } = await supabase.auth.getUser();
 
   if (data.user) {
-  await supabase
-  .from("profiles")
-  .update({
-    last_seen: new Date().toISOString(),
-  })
-    .eq("id", data.user.id);
-}
+    await supabase
+      .from("profiles")
+      .update({ last_seen: new Date().toISOString() })
+      .eq("id", data.user.id);
+  }
 
-    await supabase.auth.signOut();
+  // 🔥 scope: 'local' explicitly specify karo
+  await supabase.auth.signOut({ scope: "local" });
 
-    setUser(null);
-    setIsAuthenticated(false);
-  };
+  // 🔥 Extra safety - manually bhi purana token hata do
+  if (typeof window !== "undefined") {
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith("sb-") || key.includes("supabase")) {
+        localStorage.removeItem(key);
+      }
+    });
+    Object.keys(sessionStorage).forEach((key) => {
+      if (key.startsWith("sb-") || key.includes("supabase")) {
+        sessionStorage.removeItem(key);
+      }
+    });
+  }
+
+  setUser(null);
+  setIsAuthenticated(false);
+};
 
   // 🧾 PROFILE UPDATE (LOCAL + OPTIONAL DB SAVE)
   const updateProfile = async (updates: Partial<UserProfile>) => {
