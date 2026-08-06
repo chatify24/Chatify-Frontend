@@ -14,7 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
 import { User, Shield, Lock, Sun, Moon, CheckCircle, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/supabaseClient";
-
+import { sendNotification, isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
 import { Trash2 } from "lucide-react";
 import { savePrefs } from "@/lib/savePrefs";
 import {
@@ -76,6 +76,7 @@ type PreferencesType = {
   online_visible?: boolean;
   read_receipts_enabled?: boolean;
   typing_indicator?: boolean;
+  notifications_enabled?: boolean;
 };
 
 const getInitials = (name?: string) => {
@@ -87,6 +88,20 @@ const getInitials = (name?: string) => {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase());
   return initials.join("");
+};
+const showNotification = async (title: string, body: string) => {
+  try {
+    let granted = await isPermissionGranted();
+    if (!granted) {
+      const permission = await requestPermission();
+      granted = permission === 'granted';
+    }
+    if (granted) {
+      sendNotification({ title, body });
+    }
+  } catch (err) {
+    console.error("Notification failed:", err);
+  }
 };
 
 const getFirstName = (name?: string) => {
@@ -151,6 +166,7 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     online_visible: preferences.online_visible ?? true,
     read_receipts_enabled: preferences.read_receipts_enabled ?? true,
     typing_indicator: preferences.typing_indicator ?? true,
+    notifications_enabled: preferences.notifications_enabled ?? true,
     blocked: [] as string[],
   });
   useEffect(() => {
@@ -179,6 +195,7 @@ useEffect(() => {
           online_visible: data.online_visible ?? true,
           read_receipts_enabled: data.read_receipts_enabled ?? true,
           typing_indicator: data.typing_indicator ?? true,
+          notifications_enabled: data.notifications_enabled ?? true,
           blocked: data.blocked || [],
         });
         // ✅ theme state/applyTheme yahan bilkul mat chhuao
@@ -642,21 +659,32 @@ return (
               </div>
             )}
 
-            {/* Notifications Tab */}
-            {activeTab === 'notifications' && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors">
-                  <div>
-                    <p className="font-medium text-sm">Typing Indicator</p>
-                    <p className="text-xs text-muted-foreground">Show when you're typing</p>
-                  </div>
-                  <Toggle
-                    checked={localPrefs.typing_indicator}
-                    onChange={(v) => updatePreference('typing_indicator', v)}
-                  />
-                </div>
-              </div>
-            )}
+          {/* Notifications Tab */}
+{activeTab === 'notifications' && (
+  <div className="space-y-3">
+    <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors">
+      <div>
+        <p className="font-medium text-sm">Show Notifications</p>
+        <p className="text-xs text-muted-foreground">Get popup alerts for new messages</p>
+      </div>
+      <Toggle
+        checked={localPrefs.notifications_enabled}
+        onChange={(v) => updatePreference('notifications_enabled', v)}
+      />
+    </div>
+
+    <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors">
+      <div>
+        <p className="font-medium text-sm">Typing Indicator</p>
+        <p className="text-xs text-muted-foreground">Show when you're typing</p>
+      </div>
+      <Toggle
+        checked={localPrefs.typing_indicator}
+        onChange={(v) => updatePreference('typing_indicator', v)}
+      />
+    </div>
+  </div>
+)}
           </div>
         </div>
       </div>
@@ -722,7 +750,7 @@ preferences: PreferencesType;
   const { blockedUsers } = useSocket();
   const userEmail = authUser?.email;
   const navigate = useNavigate();
-if (!userEmail) return null;
+
   
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [requestLoading, setRequestLoading] = useState(false);
@@ -1220,7 +1248,7 @@ const visibleContacts = finalFiltered.filter((contact) => {
   // 🔥 Dono case mein sidebar se hide karo
   return !blockedByMe && !blockedByThem;
 });
-
+    if (!userEmail) return null;
   return (
     <div className="flex h-full w-full md:w-80 flex-col border-r bg-card relative">
 
@@ -4720,6 +4748,22 @@ useEffect(() => {
 
     // 🔥 unread count sirf dusre se aaye message pe badhao, apne khud ke message pe nahi
     if (!isOwnMessage) {
+      // 🔥 NOTIFICATION — sirf tab dikhao jab is contact ka chat abhi khula hua na ho
+ const isChatOpen = activeContact && getContactKey(activeContact) === conversationKey;
+      const notificationsEnabled = preferences.notifications_enabled !== false; // 🔥 NAYA CHECK
+      if (!isChatOpen && notificationsEnabled) {
+        const senderProfile = friends.find(
+          (f) => f.id === conversationKey || f.email === conversationKey
+        );
+        const senderName = senderProfile?.name || "New message";
+
+        let notifBody = payload.text;
+        if (payload.text?.startsWith("[IMAGE]")) notifBody = "📷 Photo";
+        else if (payload.text?.startsWith("[AUDIO]")) notifBody = "🎤 Voice message";
+
+        showNotification(senderName, notifBody);
+      }
+
       setUnreadCounts((prev) => {
         if (
           (activeContact && getContactKey(activeContact) === conversationKey) ||
@@ -4743,7 +4787,7 @@ useEffect(() => {
   return () => {
     if (typeof unsubscribe === "function") unsubscribe();
   };
-}, [onMessageReceived, activeContact, preferences.muted]);
+}, [onMessageReceived, activeContact, preferences.muted, friends]); // 🔥 friends dependency add ki
   // 🔌 Request sent messages status when socket connects
  useEffect(() => {
   if (isConnected && requestPendingMessages) {
@@ -5315,6 +5359,7 @@ useEffect(() => {
           online_visible: data.online_visible ?? true,
           read_receipts_enabled: data.read_receipts_enabled ?? true,
           typing_indicator: data.typing_indicator ?? true,
+          notifications_enabled: data.notifications_enabled ?? true,
         }));
       }
     } catch (err) {
@@ -5787,18 +5832,12 @@ if (isSelfChat) {
   }
 };
 
- const handleLogout = () => {
-
-setLogoutLoading(true);
-
-setTimeout(() => {
-
-logout();
-setDialogOpen(false);
-navigate("/auth");
-
-},2500);
-
+const handleLogout = () => {
+  setLogoutLoading(true);
+  setTimeout(async () => {
+    await logout();          
+    navigate("/auth", { replace: true });
+  }, 2500);
 };
 useEffect(() => {
   const handlePopState = (event: PopStateEvent) => {

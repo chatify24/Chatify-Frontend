@@ -1,41 +1,44 @@
 import { createClient } from "@supabase/supabase-js";
+import { Store } from "@tauri-apps/plugin-store";
 
 const supabaseUrl = "https://lbfplybfspcnnitrzmoj.supabase.co";
 const supabaseKey = "sb_publishable_eQPg98Sid1Q2rD2lki6eMg__StzT6EE";
 
-const isTauriApp =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
-// 🔥 Tauri app (Android/Desktop) -> localStorage (persist across restarts)
-// Web browser -> sessionStorage (multi-tab, alag account per tab)
-const authStorage = {
-  getItem: (key: string) => {
-    if (typeof window === "undefined") return null;
-    return isTauriApp
-      ? localStorage.getItem(key)
-      : sessionStorage.getItem(key);
+let tauriStorePromise: Promise<Store> | null = null;
+const getTauriStore = () => {
+  if (!tauriStorePromise) {
+    tauriStorePromise = Store.load("auth-session.json");
+  }
+  return tauriStorePromise;
+};
+
+const tauriStorageAdapter = {
+  getItem: async (key: string) => {
+    const store = await getTauriStore();
+    const value = await store.get<string>(key);
+    return value ?? null;
   },
-  setItem: (key: string, value: string) => {
-    if (typeof window === "undefined") return;
-    if (isTauriApp) {
-      localStorage.setItem(key, value);
-    } else {
-      sessionStorage.setItem(key, value);
-    }
+  setItem: async (key: string, value: string) => {
+    const store = await getTauriStore();
+    await store.set(key, value);
+    await store.save();
   },
-  removeItem: (key: string) => {
-    if (typeof window === "undefined") return;
-    if (isTauriApp) {
-      localStorage.removeItem(key);
-    } else {
-      sessionStorage.removeItem(key);
-    }
+  removeItem: async (key: string) => {
+    const store = await getTauriStore();
+    await store.delete(key);
+    await store.save();
   },
 };
 
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
-    storage: authStorage,
+    storage: isTauri
+      ? tauriStorageAdapter
+      : typeof window !== "undefined"
+      ? window.localStorage
+      : undefined,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,

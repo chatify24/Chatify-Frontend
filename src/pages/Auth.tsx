@@ -61,6 +61,22 @@ useEffect(() => {
 
 
 
+const commonTLDs = [
+  "com", "net", "org", "edu", "gov", "co", "in", "io", "info",
+  "biz", "me", "app", "dev", "xyz", "us", "uk", "ca", "au",
+  "co.in", "edu.in", "gov.in", "ac.in", "org.in"
+];
+
+const validateEmailFormat = (email: string) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z.]{2,}$/;
+  if (!emailRegex.test(email)) return false;
+
+  const domainPart = email.split("@")[1] || "";
+  const tld = domainPart.split(".").slice(1).join(".").toLowerCase();
+
+  return commonTLDs.includes(tld);
+};
+
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
@@ -70,12 +86,11 @@ const handleSubmit = async (e: React.FormEvent) => {
   }
   const normalizedEmail = email.toLowerCase().trim();
 
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-if (!emailRegex.test(normalizedEmail)) {
-  toast({ title: "Invalid email format", description: "Please enter a valid email", variant: "destructive" });
-  setLoading(false);
-  return;
-}
+  if (!validateEmailFormat(normalizedEmail)) {
+    toast({ title: "Invalid email format", description: "Please enter a valid email", variant: "destructive" });
+    setLoading(false);
+    return;
+  }
 
   setLoading(true);
 
@@ -111,7 +126,7 @@ if (!emailRegex.test(normalizedEmail)) {
   }
 
   // 📝 SIGNUP
-else {
+  else {
     if (password !== confirmPassword) {
       toast({ title: "Passwords do not match", variant: "destructive" });
       setLoading(false);

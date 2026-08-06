@@ -13,21 +13,23 @@ const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetPro
   const [retryFailed, setRetryFailed] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-useEffect(() => {
+  useEffect(() => {
     const checkConnection = async () => {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 5000);
 
         const res = await fetch(
-  `https://chatify-backend-mrlh.onrender.com/health`,
-  { method: "GET", cache: "no-store", signal: controller.signal }
-);
+          `https://chatify-backend-mrlh.onrender.com/health?_=${Date.now()}`,
+          { method: "GET", cache: "no-store", signal: controller.signal }
+        );
         clearTimeout(timeout);
 
         if (!res.ok) throw new Error("Not ok");
 
         setVisible(false);
+        setIsRetrying(false);
+        setRetryFailed(false);
         onVisibilityChange?.(false);
       } catch {
         setVisible(true);
@@ -37,12 +39,18 @@ useEffect(() => {
 
     checkConnection();
 
+    // Poll every 4 seconds — Android WebView doesn't fire online/offline reliably
+    const pollInterval = setInterval(checkConnection, 4000);
+
+    // Recheck immediately when app comes back to foreground (Android resume)
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        checkConnection();
+      }
+    };
+
     const handleOnline = () => {
-      setVisible(false);
-      setIsRetrying(false);
-      setRetryFailed(false);
-      onReconnect?.();
-      onVisibilityChange?.(false);
+      checkConnection();
     };
 
     const handleOffline = () => {
@@ -53,15 +61,18 @@ useEffect(() => {
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
+      clearInterval(pollInterval);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      document.removeEventListener("visibilitychange", handleVisibility);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
-const handleRetry = useCallback(() => {
+  const handleRetry = useCallback(() => {
     if (isRetrying) return;
     setIsRetrying(true);
     setRetryFailed(false);
@@ -72,9 +83,9 @@ const handleRetry = useCallback(() => {
         const timeout = setTimeout(() => controller.abort(), 5000);
 
         const res = await fetch(
-  `https://chatify-backend-mrlh.onrender.com/health?_=${Date.now()}`,
-  { method: "GET", cache: "no-store", signal: controller.signal }
-);
+          `https://chatify-backend-mrlh.onrender.com/health?_=${Date.now()}`,
+          { method: "GET", cache: "no-store", signal: controller.signal }
+        );
         clearTimeout(timeout);
 
         if (!res.ok) throw new Error("Not ok");

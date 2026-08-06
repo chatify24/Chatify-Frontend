@@ -170,9 +170,13 @@ className="w-full px-8 py-4 rounded-xl bg-primary text-white font-semibold text-
                 <div className="relative bg-gradient-to-br from-primary/5 to-accent/5 p-8">
                   <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/5 rounded-full blur-3xl"></div>
                   <div className="relative text-center space-y-6">
-                    <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-gradient-to-br from-primary to-orange-600 text-white mx-auto">
-                      <Download className="h-8 w-8" />
-                    </div>
+                    <div className={`inline-flex items-center justify-center h-16 w-16 rounded-2xl text-white mx-auto ${
+  downloadType === 'android' 
+    ? 'bg-gradient-to-br from-[#3DDC84] to-green-600' 
+    : 'bg-gradient-to-br from-primary to-orange-600'
+}`}>
+  <Download className="h-8 w-8" />
+</div>
                     <div>
                       <h3 className="text-2xl font-bold text-foreground mb-2">
   {downloadType === 'android' ? 'Download for Android?' : 'Download for Windows?'}
