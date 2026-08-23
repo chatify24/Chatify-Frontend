@@ -119,7 +119,7 @@ const SplashScreen = ({ onDone }: Props) => {
       {state === "available" && (
         <div className="flex flex-col items-center text-center gap-3">
           <p className="text-base text-muted-foreground m-0">
-            Updates available — v{newVersion}
+            Updates Available — v{newVersion}
           </p>
           <button
             onClick={startUpdate}

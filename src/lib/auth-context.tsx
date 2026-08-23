@@ -35,11 +35,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 🔁 AUTO LOGIN + ONLINE SET
+// 🔁 AUTO LOGIN + ONLINE SET
   useEffect(() => {
     const getSession = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
+        const { data, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.log("[auth] getSession error (possibly offline):", error.message);
+          return;
+        }
+
         if (data.session?.user) {
           const userId = data.session.user.id;
 
@@ -49,7 +55,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .eq("id", userId)
             .single();
 
-          // 🟢 ONLINE SET
           await supabase
             .from("profiles")
             .update({ last_seen: new Date().toISOString() })
@@ -63,9 +68,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
 
           setIsAuthenticated(true);
+          setupFcmToken(userId);
         } else {
-          // 🔥 NEW: agar session na mile toh state ko explicitly clear karo
-          // (Android resume ke baad stale state na reh jaye)
           setUser(null);
           setIsAuthenticated(false);
         }
@@ -76,7 +80,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     getSession();
 
-    // 🔥 Real-time auth state listener - logout ke baad session ko turant sync karega
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("[auth] state changed:", event);
 
@@ -86,14 +89,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (event === "SIGNED_IN" && session?.user) {
-        // Optional: agar future me kisi aur tab/device se login ho to yaha sync ho jayega
+        // Optional
       }
     });
 
-    // 🔥 NEW: App resume hone par (Android background se wapas aane par,
-    // ya laptop pe tab dobara active hone par) session ko fresh verify karo.
-    // Android WebView background se resume hone par kabhi kabhi stale state
-    // reh jaati thi - ye fix usko turant recheck karta hai.
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
         getSession();
@@ -101,11 +100,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
+    const handleReconnect = () => {
+      console.log("[auth] network reconnected, re-verifying session");
+      getSession();
+    };
+    window.addEventListener("app-reconnected", handleReconnect);
+
     return () => {
       listener.subscription.unsubscribe();
       document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("app-reconnected", handleReconnect);
     };
   }, []);
+  
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -122,6 +129,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => clearInterval(interval);
   }, []);
+  const setupFcmToken = async (userId: string) => {
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
+  try {
+    const { checkPermissions, requestPermissions, register, getToken } = await import("tauri-plugin-fcm");
+    let permission = await checkPermissions();
+    if (permission === "prompt" || permission === "prompt-with-rationale") {
+      permission = await requestPermissions();
+    }
+    if (permission === "granted") {
+      await register();
+      const { token } = await getToken();
+      if (token) {
+        await supabase.from("profiles").update({ fcm_token: token }).eq("id", userId);
+        console.log("[fcm] token saved successfully");
+      }
+    }
+  } catch (err) {
+    console.error("FCM setup failed:", err);
+  }
+};
 
   // 🔐 SIGNUP
   const signup = async (email: string, password: string): Promise<AuthResult> => {
@@ -164,7 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true, profileComplete: false };
   };
 
-  // 🔐 LOGIN
+// 🔐 LOGIN
   const login = async (email: string, password: string): Promise<AuthResult> => {
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -241,6 +268,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     setIsAuthenticated(true);
+    setupFcmToken(userId);
+
+    
+    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      import("tauri-plugin-fcm").then(async ({ checkPermissions, requestPermissions, register, getToken }) => {
+        try {
+          let permission = await checkPermissions();
+          if (permission === "prompt" || permission === "prompt-with-rationale") {
+            permission = await requestPermissions();
+          }
+          if (permission === "granted") {
+            await register();
+            const { token } = await getToken();
+            if (token) {
+              await supabase.from("profiles").update({ fcm_token: token }).eq("id", userId);
+              console.log("[fcm] token saved successfully");
+            }
+          }
+        } catch (err) {
+          console.error("FCM setup failed:", err);
+        }
+      });
+    }
 
     return { success: true, profileComplete: !!profile?.name };
   };

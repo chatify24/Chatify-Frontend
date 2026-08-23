@@ -50,8 +50,9 @@ const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetPro
     };
 
     const handleOnline = () => {
-      checkConnection();
-    };
+  checkConnection();
+  window.dispatchEvent(new Event("app-reconnected"));
+};
 
     const handleOffline = () => {
       setVisible(true);
