@@ -209,9 +209,6 @@ function AppContent({
   /*
    * 🔥 Splash abhi khatam nahi hua
    */
-    if (location.pathname === "/" && splashDone && !isLoading) {
-    return <Welcome />;
-  }
   if (!splashDone) {
     return <SplashScreen onDone={onSplashDone} />;
   }
@@ -248,17 +245,17 @@ function AppContent({
 
      <Routes>
   <Route
-  path="/"
-  element={
-    isAuthenticated ? (
-      <Navigate to={isProfileComplete ? "/chat" : "/profile"} replace />
-    ) : (
-      <NoInternet onVisibilityChange={setIsOffline}>
-        {isTauriApp ? <Auth /> : <Welcome />}
-      </NoInternet>
-    )
-  }
-/>
+    path="/"
+    element={
+      isAuthenticated ? (
+        <Navigate to={isProfileComplete ? "/chat" : "/profile"} replace />
+      ) : (
+        <NoInternet onVisibilityChange={setIsOffline}>
+          {isTauriApp ? <Auth /> : <Welcome />}
+        </NoInternet>
+      )
+    }
+  />
 
   <Route
     path="/auth"
