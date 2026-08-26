@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "2.9.8"
+version = "2.9.17"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -28,7 +28,9 @@ tauri-plugin-process = "2"
 tauri-plugin-store = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-os = "2"
+rustls = { version = "0.23", features = ["ring"] }
 tokio = { version = "1.53.1", features = ["time"] }
 tauri-plugin-notification = "2.3.3"
 tauri-plugin-opener = "2.5.4"
 tauri-plugin-fcm = "0.2.0"
+tauri-plugin-deep-link = "2"

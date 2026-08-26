@@ -1,6 +1,9 @@
 use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    rustls::crypto::ring::default_provider()
+    .install_default()
+    .expect("Failed to install rustls crypto provider");
   let builder = tauri::Builder::default();
 
   #[cfg(mobile)]
@@ -14,6 +17,7 @@ pub fn run() {
     .plugin(tauri_plugin_store::Builder::new().build())
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_os::init())
+    .plugin(tauri_plugin_deep_link::init()) 
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(

@@ -1,7 +1,8 @@
 "use client";
 // Add these NEW imports (keep all existing ones):
 import EmojiPicker, { EmojiClickData, Theme } from "emoji-picker-react";
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { useSocket } from "@/lib/socket-context";
@@ -14,13 +15,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
 import { User, Shield, Lock, Sun, Moon, CheckCircle, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/supabaseClient";
-import { sendNotification, isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
+import { sendNotification, isPermissionGranted, requestPermission, onAction } from '@tauri-apps/plugin-notification';
 import { Trash2 } from "lucide-react";
 import { savePrefs } from "@/lib/savePrefs";
 import {
   Search, Send, Paperclip, Smile, MoreVertical, Phone, Video,
   MessageCircle, Settings as SettingsIcon, LogOut, Star, Users, VolumeX, Bell, ChevronDown,
-  ImageIcon, Mic, Clock, Check, X, Ban, Pin, Reply, Forward, ChevronLeft,
+  ImageIcon, Mic, Clock, Check, X, Ban, Pin, Reply, Forward, ChevronLeft,Pencil,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -89,7 +90,7 @@ const getInitials = (name?: string) => {
     .map((part) => part.charAt(0).toUpperCase());
   return initials.join("");
 };
-const showNotification = async (title: string, body: string) => {
+const showNotification = async (title: string, body: string, contactId?: string, isGroup: boolean = false) => {
   try {
     let granted = await isPermissionGranted();
     if (!granted) {
@@ -100,9 +101,9 @@ const showNotification = async (title: string, body: string) => {
       sendNotification({
         title,
         body,
-        channelId: 'messages', // Android ke liye
-        // 🔥 'silent' explicitly false rakho — kahin bhi silent:true set na ho
+        channelId: 'messages',
         silent: false,
+        extra: { contactId, isGroup: String(isGroup) },
       });
     }
   } catch (err) {
@@ -742,6 +743,12 @@ const CreateGroupModal = ({
   const [creating, setCreating] = useState(false);
   const [nameError, setNameError] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const [searchUID, setSearchUID] = useState("");
+const [foundUserByUid, setFoundUserByUid] = useState<any>(null);
+const [loadingUidSearch, setLoadingUidSearch] = useState(false);
+const [uidSearchDelayActive, setUidSearchDelayActive] = useState(false);
+const [uidNotFound, setUidNotFound] = useState(false);
+const [manualUsers, setManualUsers] = useState<any[]>([]); 
 
   const resetState = () => {
     setStep(1);
@@ -751,6 +758,10 @@ const CreateGroupModal = ({
     setGroupBio("");
     setGroupAvatar("");
     setNameError(false);
+     setSearchUID("");
+    setFoundUserByUid(null);
+    setUidNotFound(false);
+    setManualUsers([]);
   };
 
   const handleClose = () => {
@@ -758,16 +769,75 @@ const CreateGroupModal = ({
     onClose();
   };
 
-  const filteredContacts = friends.filter((c) =>
-    (c.name || "").toLowerCase().includes(searchQuery.toLowerCase().trim())
-  );
-
+const filteredContacts = friends.filter((c) =>
+  (c.name || "").toLowerCase().includes(searchQuery.toLowerCase().trim())
+);
+const filteredManualUsers = manualUsers
+  .filter((mu) => {
+    const muKey = (mu.email || mu.id || "").toLowerCase().trim();
+    return !friends.some((f) => {
+      const fKey = (f.email || f.id || "").toLowerCase().trim();
+      return fKey === muKey;
+    });
+  })
+  .filter((mu) => (mu.name || "").toLowerCase().includes(searchQuery.toLowerCase().trim()));
   const toggleContact = (id: string) => {
     setSelectedContacts((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+  };
+    const handleUidSearch = async () => {
+    if (!searchUID.trim()) return;
+    setFoundUserByUid(null);
+    setUidNotFound(false);
+    setLoadingUidSearch(true);
+    setUidSearchDelayActive(true);
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    const cleanedUID = searchUID.trim().replace(/\s+/g, "");
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, name, email, avatar, uid")
+      .ilike("uid", cleanedUID)
+      .single();
+
+    if (error || !data || data.email === userEmail) {
+      setFoundUserByUid(null);
+      setUidNotFound(true);
+    } else {
+      setFoundUserByUid(data);
+    }
+
+    setLoadingUidSearch(false);
+    setUidSearchDelayActive(false);
+  };
+
+  const handleAddFoundUser = () => {
+    if (!foundUserByUid) return;
+    const id = foundUserByUid.email || foundUserByUid.id;
+
+    setManualUsers((prev) =>
+      prev.some((u) => (u.email || u.id) === id)
+        ? prev
+        : [
+            ...prev,
+            {
+              id,
+              email: foundUserByUid.email,
+              name: foundUserByUid.name || foundUserByUid.uid,
+              avatar: foundUserByUid.avatar || "",
+              uid: foundUserByUid.uid,
+            },
+          ]
+    );
+
+    setSelectedContacts((prev) => new Set(prev).add(id));
+    setFoundUserByUid(null);
+    setSearchUID("");
   };
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -903,6 +973,64 @@ if (memberEmails.length > 0) {
                   className="h-10 rounded-xl border border-gray-300 bg-muted pl-10 text-sm focus:border-orange-600 focus:ring-0 outline-none shadow-none"
                 />
               </div>
+              <div className="flex gap-2 mt-2">
+                <Input
+                  placeholder="Search user by UID"
+                  value={searchUID}
+                  onChange={(e) => {
+                    setSearchUID(e.target.value);
+                    setUidNotFound(false);
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  autoComplete="off"
+                  spellCheck="false"
+                  className="h-10 rounded-xl border border-gray-300 bg-muted text-sm focus:border-orange-600 focus:ring-0 outline-none shadow-none"
+                />
+                <Button onClick={handleUidSearch} disabled={loadingUidSearch}>
+                  Search
+                </Button>
+              </div>
+
+              {loadingUidSearch && uidSearchDelayActive && (
+                <div className="mt-2 rounded-2xl border border-border bg-muted/70 px-4 py-3 shadow-sm flex items-center gap-3">
+                  <div className="h-6 w-6 border-4 border-gray-200 border-t-orange-500 rounded-full animate-spin"></div>
+                  <p className="text-sm font-medium">Searching for User</p>
+                </div>
+              )}
+
+              {foundUserByUid && (
+                <div className="mt-2 rounded-2xl border border-border bg-muted/70 px-3 py-2 shadow-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar className="h-9 w-9">
+                        <AvatarImage src={foundUserByUid.avatar} />
+                        <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
+                          {getInitials(foundUserByUid.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">{foundUserByUid.name || "User"}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">UID: {foundUserByUid.uid}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddFoundUser}
+                      className="shrink-0 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {uidNotFound && (
+                <p className="mt-2 text-xs text-red-500">User not found</p>
+              )}
+
+            
+              
               {selectedContacts.size > 0 && (
                 <p className="mt-2 text-xs text-muted-foreground">
                   {selectedContacts.size} selected
@@ -910,42 +1038,97 @@ if (memberEmails.length > 0) {
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto px-2 pb-2">
-              {filteredContacts.length === 0 ? (
+                        <div className="flex-1 overflow-y-auto px-2 pb-2">
+              {filteredContacts.length === 0 && filteredManualUsers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
                   <Users size={32} className="mb-2 opacity-50" />
                   <p className="text-sm">No contact found</p>
                 </div>
               ) : (
-                filteredContacts.map((contact) => {
-                  const id = contact.email || contact.id;
-                  const isSelected = selectedContacts.has(id);
-                  return (
-                    <button
-                      key={id}
-                      onClick={() => toggleContact(id)}
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-muted transition-colors"
-                    >
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={contact.avatar} />
-                        <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
-                          {getInitials(contact.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="flex-1 text-left text-sm font-medium">
-                        {contact.name}
-                      </span>
-                      <div
-                        className={`h-5 w-5 rounded-full flex items-center justify-center border-2 transition-colors ${isSelected
-                            ? "bg-orange-500 border-orange-500"
-                            : "border-gray-400"
-                          }`}
+                <>
+                  {/* 🔥 Added via UID - ab TOP pe */}
+                  {filteredManualUsers.length > 0 && (
+                    <>
+                      <p className="px-3 pt-2 pb-1 text-xs font-semibold text-muted-foreground">
+                        Added via UID
+                      </p>
+                      {filteredManualUsers.map((contact) => {
+                        const id = contact.email || contact.id;
+                        const isSelected = selectedContacts.has(id);
+                        return (
+                          <button
+                            key={id}
+                            onClick={() => toggleContact(id)}
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-muted transition-colors"
+                          >
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage src={contact.avatar} />
+                              <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
+                                {getInitials(contact.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 text-left min-w-0">
+                              <p className="text-sm font-medium truncate">{contact.name}</p>
+                              {contact.uid && (
+                                <p className="text-[11px] text-muted-foreground truncate">
+                                  UID: {contact.uid}
+                                </p>
+                              )}
+                            </div>
+                            <div
+                              className={`h-5 w-5 rounded-full flex items-center justify-center border-2 transition-colors ${isSelected
+                                  ? "bg-orange-500 border-orange-500"
+                                  : "border-gray-400"
+                                }`}
+                            >
+                              {isSelected && <Check className="h-3 w-3 text-white" />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                      <div className="my-2 border-t border-border" />
+                    </>
+                  )}
+
+                  {/* Normal friends list */}
+                                    {/* 🔥 Normal Contacts heading - hamesha dikhega */}
+                  {filteredContacts.length > 0 && (
+                    <p className="px-3 pt-2 pb-1 text-xs font-semibold text-muted-foreground">
+                      Contacts
+                    </p>
+                  )}
+
+                  {/* Normal friends list */}
+                  {filteredContacts.map((contact) => {
+                    const id = contact.email || contact.id;
+                    const isSelected = selectedContacts.has(id);
+                    return (
+                      <button
+                        key={id}
+                        onClick={() => toggleContact(id)}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-muted transition-colors"
                       >
-                        {isSelected && <Check className="h-3 w-3 text-white" />}
-                      </div>
-                    </button>
-                  );
-                })
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={contact.avatar} />
+                          <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
+                            {getInitials(contact.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="flex-1 text-left text-sm font-medium">
+                          {contact.name}
+                        </span>
+                        <div
+                          className={`h-5 w-5 rounded-full flex items-center justify-center border-2 transition-colors ${isSelected
+                              ? "bg-orange-500 border-orange-500"
+                              : "border-gray-400"
+                            }`}
+                        >
+                          {isSelected && <Check className="h-3 w-3 text-white" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </>
               )}
             </div>
 
@@ -1103,6 +1286,7 @@ const ChatSidebar = ({
   setPreferences,
   updateContactOrder,
   onSettingsOpen,
+  setUnreadCounts,
   setContactOrderIfMissing,
 }: {
   activeContact: Contact | null;
@@ -1113,6 +1297,7 @@ const ChatSidebar = ({
   filter: string;
   updateContactOrder: (key: string, timestamp: number) => void;
   setFilter: (f: string) => void;
+  setUnreadCounts: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   user: any;
@@ -1440,6 +1625,36 @@ useEffect(() => {
   return () => {
     channels.forEach((ch) => supabase.removeChannel(ch));
   };
+}, [userGroups, userEmail]);
+useEffect(() => {
+  if (!userEmail || userGroups.length === 0) return;
+
+  const loadInitialGroupUnread = async () => {
+    for (const g of userGroups) {
+      const { data: allMsgs } = await supabase
+        .from("group_messages")
+        .select("id, sender_email, content")
+        .eq("group_id", g.id);
+
+      const { data: readRows } = await supabase
+        .from("group_message_reads")
+        .select("message_id")
+        .eq("group_id", g.id)
+        .eq("reader_email", userEmail);
+
+      const readIds = new Set((readRows || []).map((r: any) => r.message_id));
+
+      const unread = (allMsgs || []).filter((m: any) =>
+        m.sender_email !== userEmail &&
+        !readIds.has(m.id) &&
+        !(typeof m.content === "string" && m.content.startsWith("[SYSTEM]"))
+      ).length;
+
+      setUnreadCounts((prev) => ({ ...prev, [g.id]: unread }));
+    }
+  };
+
+  loadInitialGroupUnread();
 }, [userGroups, userEmail]);
 
   // Fetch accepted friends
@@ -2199,7 +2414,7 @@ useEffect(() => {
                 </AlertDialogCancel>
 
                 <div
-                  className="flex-1"
+                  
                   style={requestLoading ? { cursor: "not-allowed" } : {}}
                 >
                   <AlertDialogAction
@@ -2298,7 +2513,7 @@ useEffect(() => {
                       }
                     }}
                     disabled={requestLoading}
-                    className="w-full"
+                    
                     style={requestLoading ? { opacity: 0.4, pointerEvents: "none" } : {}}
                   >
                     Confirm
@@ -2599,7 +2814,7 @@ useEffect(() => {
           className="fixed z-50 w-[240px] rounded-2xl border border-border bg-card shadow-2xl p-1.5 animate-in fade-in-0 zoom-in-95"
           style={{
             left: `${Math.min(contextMenu.x, window.innerWidth - 240)}px`,
-            top: `${Math.min(contextMenu.y, window.innerHeight - 260)}px`,
+            top: `${Math.min(contextMenu.y, window.innerHeight - 240)}px`,
           }}
           onMouseLeave={() => setContextMenu(null)}
         >
@@ -2676,7 +2891,7 @@ useEffect(() => {
             }}
             className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm hover:bg-muted transition-colors"
           >
-            <Star size={16} />
+            <Star size={16} className="shrink-0" />
             <span>
               {preferences.favorites.has(contextMenu.contactId)
                 ? "Remove from Favorites"
@@ -2864,7 +3079,7 @@ useEffect(() => {
   );
 };
 
-const ChatArea = ({
+const ChatArea = React.memo(({
   contact,
   messages,
   onLeaveGroup,
@@ -2932,6 +3147,10 @@ const ChatArea = ({
   const [isDark, setIsDark] = useState(
     document.documentElement.classList.contains("dark")
   );
+  const [groupNameOverride, setGroupNameOverride] = useState<string | null>(null);
+const [editingGroupName, setEditingGroupName] = useState(false);
+const [groupNameInput, setGroupNameInput] = useState("");
+const [savingGroupName, setSavingGroupName] = useState(false);
   const [groupCreatedBy, setGroupCreatedBy] = useState<string | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
@@ -3110,18 +3329,33 @@ const groupPhotoInputRef = useRef<HTMLInputElement | null>(null);
   }, []);
 
   // 🔥 YE NAYA ADD KARO
-  useEffect(() => {
-    if (!window.visualViewport) return;
-    const setHeight = () => {
+useEffect(() => {
+  if (!window.visualViewport) return;
+
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const setHeight = () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
       document.documentElement.style.setProperty(
         '--app-height',
-        `${window.visualViewport.height}px`
+        `${window.visualViewport!.height}px`
       );
-    };
-    setHeight();
-    window.visualViewport.addEventListener('resize', setHeight);
-    return () => window.visualViewport.removeEventListener('resize', setHeight);
-  }, []);
+    }, 100); // 🔥 100ms debounce - chhote fluctuations ignore honge
+  };
+
+  // Pehli baar turant set karo (no debounce needed on mount)
+  document.documentElement.style.setProperty(
+    '--app-height',
+    `${window.visualViewport.height}px`
+  );
+
+  window.visualViewport.addEventListener('resize', setHeight);
+  return () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    window.visualViewport.removeEventListener('resize', setHeight);
+  };
+}, []);
   useEffect(() => {
     const fetchBio = async () => {
       if (!contact) {
@@ -3153,8 +3387,10 @@ const groupPhotoInputRef = useRef<HTMLInputElement | null>(null);
 
     fetchBio();
   }, [contact?.email, contact?.id]);
-  useEffect(() => {
+ useEffect(() => {
   setGroupAvatarOverride(null);
+  setGroupNameOverride(null);      // 🔥 NEW
+  setEditingGroupName(false);      // 🔥 NEW
 }, [contact?.id]);
   // 🔥 Real-time block/unblock reflect karne ke liye
   useEffect(() => {
@@ -3256,7 +3492,7 @@ const groupPhotoInputRef = useRef<HTMLInputElement | null>(null);
     const { data: profiles } = emails.length
       ? await supabase
         .from("profiles")
-        .select("email, name, avatar, uid")
+        .select("email, name, avatar, uid, last_seen")
         .in("email", emails)
       : { data: [] };
 
@@ -3268,6 +3504,7 @@ const groupPhotoInputRef = useRef<HTMLInputElement | null>(null);
         name: profile?.name || m.member_email,
         avatar: profile?.avatar || "",
         uid: profile?.uid || "",
+         last_seen: profile?.last_seen || null,
       };
     });
 
@@ -3332,6 +3569,48 @@ const handleGroupPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
   } finally {
     setGroupPhotoUploading(false);
     if (groupPhotoInputRef.current) groupPhotoInputRef.current.value = "";
+  }
+};
+const handleSaveGroupName = async () => {
+  if (!contact || !groupNameInput.trim()) return;
+  setSavingGroupName(true);
+  try {
+    const { data: updateData, error } = await supabase
+      .from("groups")
+      .update({ name: groupNameInput.trim() })
+      .eq("id", contact.id)
+      .select();
+
+    if (error) {
+      console.error("Failed to update group name:", error);
+      return;
+    }
+
+    if (!updateData || updateData.length === 0) {
+      console.warn("[GroupName] 0 rows updated — RLS blocked it");
+      return;
+    }
+
+    setGroupNameOverride(groupNameInput.trim());
+
+    const { data: editorProfile } = await supabase
+      .from("profiles")
+      .select("name")
+      .eq("email", userEmail)
+      .single();
+    const editorName = editorProfile?.name || userEmail;
+
+    await supabase.from("group_messages").insert({
+      group_id: contact.id,
+      sender_email: userEmail,
+      content: `[SYSTEM]${editorName} changed the group name to ${groupNameInput.trim()}`,
+    });
+
+    setEditingGroupName(false);
+  } catch (err) {
+    console.error("Error updating group name:", err);
+  } finally {
+    setSavingGroupName(false);
   }
 };
 const handleRemoveGroupPhoto = async () => {
@@ -3556,11 +3835,11 @@ useEffect(() => {
     // 1. Apna message bheja ho
     // 2. Ya dusre ka NAYA message aaya ho (last message isOwn false ho aur bottom ke paas ho)
     if (isOwnMessage) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      bottomRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
     } else if (isNearBottomRef.current && lastMsg && !lastMsg.isOwn) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      bottomRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
     }
-  }, [localMessages.length]); // 🔥 KEY FIX: localMessages.length — sirf jab naya message aaye
+  }, [localMessages.length]); // 🔥 KEY FIX: localMessages.length — sirf jab naya message aaye // 🔥 KEY FIX: localMessages.length — sirf jab naya message aaye
 
   // 🔥 Trigger re-render when preferences change (to update blocked status immediately)
   useEffect(() => {
@@ -3900,9 +4179,9 @@ useEffect(() => {
   };
 
 
-  if (!contact) {
+if (!contact) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 bg-muted/20">
+      <div className="hidden md:flex flex-1 flex-col items-center justify-center gap-4 bg-muted/20">
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary shadow-lg">
           <MessageCircle className="h-7 w-7 text-primary-foreground -translate-y-0.5" strokeWidth={1.4} />
         </div>
@@ -4081,7 +4360,7 @@ useEffect(() => {
                   >
                     <Users size={18} />
                     <span className="text-sm">
-                      {(contact as any)?.isGroup ? "Members info" : "Contact info"}
+                      {(contact as any)?.isGroup ? "Info" : "Contact info"}
                     </span>
                   </button>
                   {(contact as any)?.isGroup &&
@@ -4724,15 +5003,20 @@ useEffect(() => {
             />
 
             {/* 😊 Emoji Button (was red-circled) */}
+                {/* 😊 Emoji Button (was red-circled) */}
             <Button
               variant="ghost"
               size="icon"
               className={`absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg transition-colors ${showEmojiPicker ? "bg-primary/10 text-primary" : ""
                 }`}
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                setShowEmojiPicker((prev) => !prev);
+              onTouchStart={(e) => {
+                e.preventDefault();
                 inputRef.current?.blur();
+              }}
+              onClick={() => {
+                inputRef.current?.blur();
+                setShowEmojiPicker((prev) => !prev);
               }}
               disabled={isBlockedByMe || isBlockedByThem}
               title="Emoji"
@@ -5019,7 +5303,7 @@ useEffect(() => {
             <div className="bg-card rounded-2xl p-6 w-full max-w-[380px] shadow-xl border border-border max-h-[80vh] flex flex-col">
 
               <h2 className="text-lg font-semibold mb-4">
-                {isGroup ? "Members Info" : "Contact Info"}
+                {isGroup ? "Info" : "Contact Info"}
               </h2>
 
               <div className="space-y-4 overflow-y-auto flex-1">
@@ -5048,8 +5332,54 @@ useEffect(() => {
     )}
 </div>
 
-    <div>
-      <p className="font-semibold text-lg">{contact.name}</p>
+      <div className="flex-1 min-w-0">
+        {isGroup && editingGroupName ? (
+        <div className="space-y-2 pr-1">
+          <input
+            autoFocus
+            value={groupNameInput}
+            onChange={(e) => setGroupNameInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSaveGroupName();
+              if (e.key === "Escape") setEditingGroupName(false);
+            }}
+            className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => setEditingGroupName(false)}
+              className="flex-1 px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-red-500 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+                        <button
+              onClick={handleSaveGroupName}
+              disabled={savingGroupName || !groupNameInput.trim()}
+              className="flex-1 px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed text-white text-xs font-medium transition-colors"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <p className="font-semibold text-lg truncate">
+            {isGroup && groupNameOverride !== null ? groupNameOverride : contact.name}
+          </p>
+          {isGroup && (
+            <button
+              onClick={() => {
+                setGroupNameInput(groupNameOverride !== null ? groupNameOverride : contact.name);
+                setEditingGroupName(true);
+              }}
+              className="p-1 rounded hover:bg-muted transition-colors shrink-0"
+              title="Edit group name"
+            >
+              <Pencil size={14} className="text-muted-foreground" />
+            </button>
+          )}
+        </div>
+      )}
       {isGroup && (
         <p className="text-xs text-muted-foreground">
           {groupMembersList.length} member{groupMembersList.length !== 1 ? "s" : ""}
@@ -5111,12 +5441,17 @@ useEffect(() => {
                             key={member.email}
                             className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-muted transition-colors"
                           >
-                            <Avatar className="h-10 w-10">
-                              <AvatarImage src={member.avatar} />
-                              <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
-                                {getInitials(member.name)}
-                              </AvatarFallback>
-                            </Avatar>
+                            <div className="relative">
+  <Avatar className="h-10 w-10">
+    <AvatarImage src={member.avatar} />
+    <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
+      {getInitials(member.name)}
+    </AvatarFallback>
+  </Avatar>
+  {(member.email === userEmail || isOnline(member.last_seen)) && (
+    <div className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-card bg-orange-500" />
+  )}
+</div>
 <div className="flex-1 min-w-0">
   <p className="text-sm font-medium truncate">
     {member.email === userEmail ? `${member.name} (You)` : member.name}
@@ -5126,6 +5461,16 @@ useEffect(() => {
       UID: {member.uid}
     </p>
   )}
+<div className="flex items-center gap-1.5 mt-0.5">
+ 
+  <span className="text-[11px] text-muted-foreground">
+    {member.email === userEmail
+      ? "Active now"
+      : isOnline(member.last_seen)
+        ? "Active now"
+        : "Not Active"}
+  </span>
+</div>
 </div>
 {member.role !== "admin" &&
   member.email !== userEmail &&
@@ -5537,7 +5882,7 @@ useEffect(() => {
                   {getInitials(r.name)}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 pr-1">
                 <p className="text-sm font-medium truncate">{r.name}</p>
                 <p className="text-[11px] text-muted-foreground">{formatMessageDateTime(r.read_at)}</p>
               </div>
@@ -5850,16 +6195,20 @@ useEffect(() => {
 
       {/* Show blocked message banner when blocked by the other person */}
 
-    </div>
+ </div>
   );
-};
-
+});
+const isTauriApp =
+  typeof window !== "undefined" &&
+  "__TAURI_INTERNALS__" in window;
 const Chat = () => {
   const { user, isAuthenticated, isProfileComplete, isLoading, logout, updateProfile: updateAuthProfile } = useAuth();
   const { isConnected, sendMessage, sendTyping, deleteMessageForEveryone, markMessagesAsRead, onMessageReceived, onMessageEdited, onMessageDeletedForEveryone, onMessageRead, onUserTyping, onUserOnline, onUserOffline, onUserBlocked, onUserUnblocked, onPendingMessagesReceived, onSentMessagesStatusReceived, requestPendingMessages, requestSentMessagesStatus, pinMessage, onMessagePinned, onMessageIdConfirmed } = useSocket();
   const [tick, setTick] = useState(0);
   const [groupOrderUpdateCount, setGroupOrderUpdateCount] = useState(0);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => 
+  typeof window !== "undefined" && window.innerWidth <= 768
+);
   const [friends, setFriends] = useState<any[]>([]);
   const [contactOrderLoaded, setContactOrderLoaded] = useState(false);
   const [activeContact, setActiveContact] = useState<Contact | null>(null);
@@ -5896,6 +6245,9 @@ const groupTypingBroadcastRef = useRef<any>(null);  // 🔥 NEW
   const [filter, setFilter] = useState("All messages");
   const [logoutLoading, setLogoutLoading] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contactOrderSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+const contactOrderSeqRef = useRef(0);
+ const activeContactRef = useRef<Contact | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [uid, setUid] = useState("");
@@ -6006,7 +6358,11 @@ useEffect(() => {
         .single();
 
       if (!error && data?.contact_order && Object.keys(data.contact_order).length > 0) {
-        setContactOrder(data.contact_order);
+        setContactOrder((prev) => {
+  const merged = { ...data.contact_order, ...prev };
+  localStorage.setItem(`contact_order_${user.email}`, JSON.stringify(merged));
+  return merged;
+});
         localStorage.setItem(`contact_order_${user.email}`, JSON.stringify(data.contact_order));
         setContactOrderLoaded(true);
         return;
@@ -6027,7 +6383,111 @@ useEffect(() => {
 
   loadContactOrder();
 }, [user?.email]);
+useEffect(() => {
+  if (!isTauriApp) return;
 
+  const unlistenPromise = onOpenUrl(async (urls) => {
+    const parsed = new URL(urls[0]);
+    const targetId = parsed.searchParams.get('id');
+    const isGroup = parsed.searchParams.get('group') === 'true';
+    if (!targetId) return;
+
+    if (isGroup) {
+      const { data: group } = await supabase.from("groups").select("*").eq("id", targetId).single();
+      if (group) {
+        handleSelectContact({
+          id: group.id,
+          name: group.name,
+          avatar: group.avatar || "",
+          email: group.id,
+          isGroup: true,
+        } as any);
+      }
+    } else {
+      const contact = friends.find((f) => f.id === targetId || f.email === targetId);
+      if (contact) handleSelectContact(contact);
+    }
+  });
+
+  return () => { unlistenPromise.then((unlisten) => unlisten()); };
+}, [friends]);
+  // 🔥 Ref banaya taaki notification click pe hamesha latest handleSelectContact use ho, stale closure na ho
+
+
+  useEffect(() => {
+    if (!isTauriApp) return;
+
+    let listener: { unregister: () => void } | undefined;
+
+    const setup = async () => {
+      listener = await onAction(async (notification: any) => {
+        const contactId = notification?.extra?.contactId;
+        const isGroup = notification?.extra?.isGroup === "true" || notification?.extra?.isGroup === true;
+
+        if (!contactId) return;
+
+        try {
+          if (isGroup) {
+            // 🔥 GROUP CHAT
+            const { data: group, error } = await supabase
+              .from("groups")
+              .select("id, name, avatar, bio")
+              .eq("id", contactId)
+              .single();
+
+            if (error || !group) {
+              console.error("Notification click: group not found", error);
+              return;
+            }
+
+            handleSelectContactRef.current({
+              id: group.id,
+              name: group.name,
+              avatar: group.avatar || "",
+              email: group.id,
+              isGroup: true,
+              bio: group.bio,
+              lastMessage: "",
+              time: "",
+              unread: 0,
+            } as any);
+          } else {
+            // 🔥 PERSONAL CHAT
+            const { data: profile, error } = await supabase
+              .from("profiles")
+              .select("id, name, email, avatar, uid, last_seen")
+              .eq("email", contactId)
+              .single();
+
+            if (error || !profile) {
+              console.error("Notification click: profile not found", error);
+              return;
+            }
+
+            handleSelectContactRef.current({
+              id: profile.email,
+              name: profile.name || "Unknown",
+              avatar: profile.avatar || "",
+              email: profile.email,
+              uid: profile.uid,
+              last_seen: profile.last_seen || null,
+              lastMessage: "",
+              time: "",
+              unread: 0,
+            } as any);
+          }
+        } catch (err) {
+          console.error("Notification click handling failed:", err);
+        }
+      });
+    };
+
+    setup();
+
+    return () => {
+      listener?.unregister();
+    };
+  }, []);
 // 🔥 Realtime - dusre device pe order change ho toh yahan bhi turant reflect ho
 useEffect(() => {
   if (!user?.email) return;
@@ -6371,6 +6831,9 @@ return () => {
       }
     }
   }, [user?.email]);
+    useEffect(() => {
+    activeContactRef.current = activeContact;
+  }, [activeContact]);
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 768);
     checkMobile();
@@ -6385,22 +6848,39 @@ const updateContactOrder = (contactKey: string, timestamp: number) => {
   setContactOrder((prev) => {
     const updated = { ...prev, [contactKey]: timestamp };
     localStorage.setItem(`contact_order_${user?.email || ""}`, JSON.stringify(updated));
+
     if (user?.email) {
-      savePrefs(user.email, "contact_order", updated); // 🔥 cross-device sync
+      const mySeq = ++contactOrderSeqRef.current;
+      if (contactOrderSaveTimerRef.current) clearTimeout(contactOrderSaveTimerRef.current);
+      contactOrderSaveTimerRef.current = setTimeout(() => {
+        // 🔥 sirf tab save karo jab ye abhi bhi sabse latest scheduled save ho
+        if (mySeq === contactOrderSeqRef.current) {
+          savePrefs(user.email, "contact_order", updated);
+        }
+      }, 600);
     }
+
     return updated;
   });
 };
 
 const setContactOrderIfMissing = (contactKey, timestamp) => {
-   if (!contactOrderLoaded) return;
+  if (!contactOrderLoaded) return;
   setContactOrder((prev) => {
     if (prev[contactKey]) return prev;
     const updated = { ...prev, [contactKey]: timestamp };
     localStorage.setItem(`contact_order_${user?.email || ""}`, JSON.stringify(updated));
+
     if (user?.email) {
-      savePrefs(user.email, "contact_order", updated); // 🔥 cross-device sync
+      const mySeq = ++contactOrderSeqRef.current;
+      if (contactOrderSaveTimerRef.current) clearTimeout(contactOrderSaveTimerRef.current);
+      contactOrderSaveTimerRef.current = setTimeout(() => {
+        if (mySeq === contactOrderSeqRef.current) {
+          savePrefs(user.email, "contact_order", updated);
+        }
+      }, 600);
     }
+
     return updated;
   });
 };
@@ -6520,12 +7000,14 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
         localStorage.setItem(msgKey, JSON.stringify(updated));
         return updated;
       });
-     updateContactOrder(conversationKey, Date.now());
+     updateContactOrder(conversationKey, payload.timestamp);
 
       // 🔥 unread count sirf dusre se aaye message pe badhao, apne khud ke message pe nahi
+      // 🔥 unread count sirf dusre se aaye message pe badhao, apne khud ke message pe nahi
       if (!isOwnMessage) {
-        // 🔥 NOTIFICATION — sirf tab dikhao jab is contact ka chat abhi khula hua na ho
-        const isChatOpen = activeContact && getContactKey(activeContact) === conversationKey;
+        // 🔥 NOTIFICATION — sirf tab dikhao jab is contact ka chat abhi khula hua na ho (ref se latest state)
+        const currentActiveContact = activeContactRef.current;
+        const isChatOpen = currentActiveContact && getContactKey(currentActiveContact) === conversationKey;
         const notificationsEnabled = preferences.notifications_enabled !== false; // 🔥 NAYA CHECK
         if (!isChatOpen && notificationsEnabled) {
           const senderProfile = friends.find(
@@ -6541,8 +7023,9 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
         }
 
         setUnreadCounts((prev) => {
+          const latestActiveContact = activeContactRef.current;
           if (
-            (activeContact && getContactKey(activeContact) === conversationKey) ||
+            (latestActiveContact && getContactKey(latestActiveContact) === conversationKey) ||
             payload.status === "read"
           ) {
             return prev;
@@ -6622,11 +7105,14 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
           status: message.status,
         };
 
+        let alreadyExists = false;
+
         setAllMessages((prev) => {
           const conversationMessages = prev[conversationKey] || [];
           const exists = conversationMessages.some((m: any) => m.id === payload.id);
           if (exists) {
             console.log(`[v0] Skipping duplicate message: ${payload.id}`);
+            alreadyExists = true;
             return prev;
           }
           const updated = {
@@ -6636,7 +7122,11 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
           localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
           return updated;
         });
-        updateContactOrder(conversationKey, Date.now());
+
+        // 🔥 agar message pehle se hai (duplicate/pending resend), toh order aur unread dono skip karo
+        if (alreadyExists) return;
+
+        updateContactOrder(conversationKey, payload.timestamp);
 
         setUnreadCounts((prev) => {
           if (
@@ -7190,7 +7680,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
   useEffect(() => {
     const interval = setInterval(() => {
       setTick((t) => t + 1);
-    }, 3000); // 🔥 every 3 sec refresh
+    }, 15000); // 🔥 every 15 sec refresh — memo lagne ke baad bhi input lag na ho isliye interval badhaya
 
     return () => clearInterval(interval);
   }, []);
@@ -7382,6 +7872,11 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
       });
     }
   };
+    // 🔥 Ref banaya taaki notification click pe hamesha latest handleSelectContact use ho, stale closure na ho
+  const handleSelectContactRef = useRef(handleSelectContact);
+  useEffect(() => {
+    handleSelectContactRef.current = handleSelectContact;
+  });
 
   // 🔥 Message action handlers
   // Delete for Me - completely remove message from view (only for this user)
@@ -7718,16 +8213,16 @@ const sendGroupTyping = (isTyping: boolean) => {
 
   const currentMessages = activeContact ? allMessages[getContactKey(activeContact)] || [] : [];
 
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary"></div>
-          <p className="mt-2 text-sm text-muted-foreground">Loading...</p>
-        </div>
+if (isLoading) {
+  return (
+    <div className="flex h-screen items-center justify-center bg-background">
+      <div className="text-center">
+        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary"></div>
+        <p className="mt-2 text-sm text-muted-foreground">Loading...</p>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   return (
     <div className="flex overflow-y-auto bg-background app-height">
@@ -7745,6 +8240,7 @@ const sendGroupTyping = (isTyping: boolean) => {
           filter={filter}
           setFilter={setFilter}
           searchQuery={searchQuery}
+          setUnreadCounts={setUnreadCounts}
           groupActivityCount={groupActivityCount}  
           setGroupTypingUsers={setGroupTypingUsers}
           setTypingProfilesCache={setTypingProfilesCache}

@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Chatify",
-  "version": "2.9.8",
+  "version": "2.9.17",
   "identifier": "com.chatify.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -46,6 +46,11 @@
         "https://github.com/chatify24/Chatify/releases/latest/download/latest.json"
       ],
       "dialog": false
-    }
+    },
+    "deep-link": {
+  "mobile": [
+    { "host": "chat", "scheme": ["chatify"] }
+  ]
+}
   }
 }

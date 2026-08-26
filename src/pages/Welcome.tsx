@@ -7,19 +7,24 @@ export default function Welcome() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
-  const [step, setStep] = useState<'confirm' | 'downloading' | 'ready'>('confirm');
+const [step, setStep] = useState<'confirm' | 'downloading' | 'ready' | 'comingSoon'>('confirm');
   const [isDownloading, setIsDownloading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [downloadType, setDownloadType] = useState<'windows' | 'android'>('windows');
-
+const [gotItHover, setGotItHover] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const handleInstallClick = () => {
-    setStep('confirm');
-    setShowPopup(true);
-  };
+const handleInstallClick = () => {
+  setStep('confirm');
+  setShowPopup(true);
+};
+
+const handleAndroidClick = () => {
+  setStep('comingSoon');
+  setShowPopup(true);
+};
 
  const startDownload = () => {
   setIsDownloading(true);
@@ -134,7 +139,7 @@ className="w-full px-8 py-4 rounded-xl bg-primary text-white font-semibold text-
   </div>
 </button>
 <button
-  onClick={() => { setDownloadType('android'); handleInstallClick(); }}
+  onClick={() => { setDownloadType('android'); handleAndroidClick(); }}
   className="w-full px-8 py-4 rounded-xl bg-[#3DDC84] text-white font-semibold text-lg transition-all duration-300 hover:opacity-85 active:scale-95"
 >
   <div className="flex items-center justify-center gap-2">
@@ -208,6 +213,43 @@ className="w-full px-8 py-4 rounded-xl bg-primary text-white font-semibold text-
                 </div>
               </div>
             )}
+            {step === 'comingSoon' && (
+  <div className="animate-scale-in rounded-3xl bg-white shadow-2xl overflow-hidden border border-border/30">
+    <div className="relative bg-gradient-to-br from-[#3DDC84]/5 to-green-100 p-8">
+      <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#3DDC84]/10 rounded-full blur-3xl"></div>
+      <div className="relative text-center space-y-6">
+        <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-gradient-to-br from-[#3DDC84] to-green-600 text-white mx-auto">
+          <Clock className="h-8 w-8" />
+        </div>
+        <div>
+          <h3 className="text-2xl font-bold text-foreground mb-2">
+            Chatify Coming Soon
+          </h3>
+          <p className="text-muted-foreground text-sm">
+            We're working on making Chatify even better for Android. Thanks for your patience — updates are on the way!
+          </p>
+        </div>
+<button
+  onClick={() => setShowPopup(false)}
+  className="w-full px-6 py-3 rounded-xl border border-gray-200 text-gray-900 font-semibold shadow-sm transition-colors duration-300"
+  style={{ backgroundColor: '#f3f4f6' }}
+  onMouseEnter={(e) => {
+    e.currentTarget.style.backgroundColor = '#3DDC84';
+    e.currentTarget.style.color = '#ffffff';
+    e.currentTarget.style.borderColor = '#3DDC84';
+  }}
+  onMouseLeave={(e) => {
+    e.currentTarget.style.backgroundColor = '#f3f4f6';
+    e.currentTarget.style.color = '#111827';
+    e.currentTarget.style.borderColor = '#e5e7eb';
+  }}
+>
+  Got it
+</button>
+      </div>
+    </div>
+  </div>
+)}
 
            
 
