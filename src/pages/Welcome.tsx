@@ -226,7 +226,7 @@ className="w-full px-8 py-4 rounded-xl bg-primary text-white font-semibold text-
             This app is currently unavailable
           </h3>
           <p className="text-muted-foreground text-sm">
-            We're working on making Chatify even better for Android. Thanks for your patience — updates are on the way!
+            We're working on making Chatify better for Android. Thanks for your patience.
           </p>
         </div>
 <button
