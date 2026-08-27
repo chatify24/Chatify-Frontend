@@ -223,7 +223,7 @@ className="w-full px-8 py-4 rounded-xl bg-primary text-white font-semibold text-
         </div>
         <div>
           <h3 className="text-2xl font-bold text-foreground mb-2">
-            Chatify Coming Soon
+            This app is currently unavailable
           </h3>
           <p className="text-muted-foreground text-sm">
             We're working on making Chatify even better for Android. Thanks for your patience — updates are on the way!
