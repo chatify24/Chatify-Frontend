@@ -3144,6 +3144,10 @@ const ChatArea = React.memo(({
 }) => {
   // 🎤 Mic recording state
   const [isRecording, setIsRecording] = useState(false);
+   const [isAndroidApp] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return "__TAURI_INTERNALS__" in window && /android/i.test(navigator.userAgent || "");
+  });
   const [isDark, setIsDark] = useState(
     document.documentElement.classList.contains("dark")
   );
@@ -5002,27 +5006,28 @@ if (!contact) {
                 }`}
             />
 
-            {/* 😊 Emoji Button (was red-circled) */}
-                {/* 😊 Emoji Button (was red-circled) */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className={`absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg transition-colors ${showEmojiPicker ? "bg-primary/10 text-primary" : ""
-                }`}
-              onMouseDown={(e) => e.preventDefault()}
-              onTouchStart={(e) => {
-                e.preventDefault();
-                inputRef.current?.blur();
-              }}
-              onClick={() => {
-                inputRef.current?.blur();
-                setShowEmojiPicker((prev) => !prev);
-              }}
-              disabled={isBlockedByMe || isBlockedByThem}
-              title="Emoji"
-            >
-              <Smile className="h-5 w-5 text-muted-foreground" />
-            </Button>
+                        {/* 😊 Emoji Button - Android app pe hide, phone ka keyboard emoji use hoga */}
+            {!isAndroidApp && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg transition-colors ${showEmojiPicker ? "bg-primary/10 text-primary" : ""
+                  }`}
+                onMouseDown={(e) => e.preventDefault()}
+                onTouchStart={(e) => {
+                  e.preventDefault();
+                  inputRef.current?.blur();
+                }}
+                onClick={() => {
+                  inputRef.current?.blur();
+                  setShowEmojiPicker((prev) => !prev);
+                }}
+                disabled={isBlockedByMe || isBlockedByThem}
+                title="Emoji"
+              >
+                <Smile className="h-5 w-5 text-muted-foreground" />
+              </Button>
+            )}
           </div>
 
           {/* 🎤 Mic Button (was red-circled) */}
@@ -6248,6 +6253,7 @@ const groupTypingBroadcastRef = useRef<any>(null);  // 🔥 NEW
   const contactOrderSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 const contactOrderSeqRef = useRef(0);
  const activeContactRef = useRef<Contact | null>(null);
+  const handleSelectContactRef = useRef<(contact: Contact) => void>(() => {});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [uid, setUid] = useState("");
@@ -6414,80 +6420,81 @@ useEffect(() => {
   // 🔥 Ref banaya taaki notification click pe hamesha latest handleSelectContact use ho, stale closure na ho
 
 
-  useEffect(() => {
-    if (!isTauriApp) return;
+useEffect(() => {
+  if (!isTauriApp) return;
 
-    let listener: { unregister: () => void } | undefined;
+  let listener: { unregister: () => void } | undefined;
 
-    const setup = async () => {
-      listener = await onAction(async (notification: any) => {
-        const contactId = notification?.extra?.contactId;
-        const isGroup = notification?.extra?.isGroup === "true" || notification?.extra?.isGroup === true;
+  const setup = async () => {
+    listener = await onAction(async (performedAction: any) => {
+      // 🔥 FIX: extra ab performedAction.notification.extra mein hai
+      const notif = performedAction?.notification;
+      const contactId = notif?.extra?.contactId;
+      const isGroup =
+        notif?.extra?.isGroup === "true" || notif?.extra?.isGroup === true;
 
-        if (!contactId) return;
+      if (!contactId) return;
 
-        try {
-          if (isGroup) {
-            // 🔥 GROUP CHAT
-            const { data: group, error } = await supabase
-              .from("groups")
-              .select("id, name, avatar, bio")
-              .eq("id", contactId)
-              .single();
+      try {
+        if (isGroup) {
+          const { data: group, error } = await supabase
+            .from("groups")
+            .select("id, name, avatar, bio")
+            .eq("id", contactId)
+            .single();
 
-            if (error || !group) {
-              console.error("Notification click: group not found", error);
-              return;
-            }
-
-            handleSelectContactRef.current({
-              id: group.id,
-              name: group.name,
-              avatar: group.avatar || "",
-              email: group.id,
-              isGroup: true,
-              bio: group.bio,
-              lastMessage: "",
-              time: "",
-              unread: 0,
-            } as any);
-          } else {
-            // 🔥 PERSONAL CHAT
-            const { data: profile, error } = await supabase
-              .from("profiles")
-              .select("id, name, email, avatar, uid, last_seen")
-              .eq("email", contactId)
-              .single();
-
-            if (error || !profile) {
-              console.error("Notification click: profile not found", error);
-              return;
-            }
-
-            handleSelectContactRef.current({
-              id: profile.email,
-              name: profile.name || "Unknown",
-              avatar: profile.avatar || "",
-              email: profile.email,
-              uid: profile.uid,
-              last_seen: profile.last_seen || null,
-              lastMessage: "",
-              time: "",
-              unread: 0,
-            } as any);
+          if (error || !group) {
+            console.error("Notification click: group not found", error);
+            return;
           }
-        } catch (err) {
-          console.error("Notification click handling failed:", err);
+
+          handleSelectContactRef.current({
+            id: group.id,
+            name: group.name,
+            avatar: group.avatar || "",
+            email: group.id,
+            isGroup: true,
+            bio: group.bio,
+            lastMessage: "",
+            time: "",
+            unread: 0,
+          } as any);
+        } else {
+          const { data: profile, error } = await supabase
+            .from("profiles")
+            .select("id, name, email, avatar, uid, last_seen")
+            .eq("email", contactId)
+            .single();
+
+          if (error || !profile) {
+            console.error("Notification click: profile not found", error);
+            return;
+          }
+
+          handleSelectContactRef.current({
+            id: profile.email,
+            name: profile.name || "Unknown",
+            avatar: profile.avatar || "",
+            email: profile.email,
+            uid: profile.uid,
+            last_seen: profile.last_seen || null,
+            lastMessage: "",
+            time: "",
+            unread: 0,
+          } as any);
         }
-      });
-    };
+      } catch (err) {
+        console.error("Notification click handling failed:", err);
+      }
+    });
+  };
 
-    setup();
+  setup();
 
-    return () => {
-      listener?.unregister();
-    };
-  }, []);
+  return () => {
+    listener?.unregister();
+  };
+}, []);
 // 🔥 Realtime - dusre device pe order change ho toh yahan bhi turant reflect ho
 useEffect(() => {
   if (!user?.email) return;
@@ -7009,7 +7016,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
         const currentActiveContact = activeContactRef.current;
         const isChatOpen = currentActiveContact && getContactKey(currentActiveContact) === conversationKey;
         const notificationsEnabled = preferences.notifications_enabled !== false; // 🔥 NAYA CHECK
-        if (!isChatOpen && notificationsEnabled) {
+              if (!isChatOpen && notificationsEnabled) {
           const senderProfile = friends.find(
             (f) => f.id === conversationKey || f.email === conversationKey
           );
@@ -7019,7 +7026,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
           if (payload.text?.startsWith("[IMAGE]")) notifBody = "📷 Photo";
           else if (payload.text?.startsWith("[AUDIO]")) notifBody = "🎤 Voice message";
 
-          showNotification(senderName, notifBody);
+          showNotification(senderName, notifBody, conversationKey, false);
         }
 
         setUnreadCounts((prev) => {
@@ -7194,7 +7201,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
       if (typeof unsubscribe === "function") unsubscribe();
     };
   }, [onSentMessagesStatusReceived]);
-   useEffect(() => {
+     useEffect(() => {
     if (!user?.email) return;
 
     const channel = supabase
@@ -7202,7 +7209,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "group_messages" },
-        (payload: any) => {
+        async (payload: any) => {
           const m = payload.new;
           const groupId = m.group_id;
           const isSystemMsg = typeof m.content === "string" && m.content.startsWith("[SYSTEM]");
@@ -7210,8 +7217,10 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
 
           if (isOwnMessage || isSystemMsg) return;
 
+          // 🔥 activeContactRef se latest state lo, stale closure na ho
+          const currentActiveContact = activeContactRef.current;
           const isChatOpen =
-            activeContact && (activeContact as any)?.isGroup && activeContact.id === groupId;
+            currentActiveContact && (currentActiveContact as any)?.isGroup && currentActiveContact.id === groupId;
 
           if (isChatOpen || preferences.muted.has(groupId)) return;
 
@@ -7221,6 +7230,35 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
             localStorage.setItem(unreadKey, JSON.stringify(updated));
             return updated;
           });
+
+          // 🔥 NAYA: Local push notification bhejo (app open hone par bhi)
+          const notificationsEnabled = preferences.notifications_enabled !== false;
+          if (!notificationsEnabled) return;
+
+          try {
+            const { data: group } = await supabase
+              .from("groups")
+              .select("name")
+              .eq("id", groupId)
+              .single();
+
+            const { data: senderProfile } = await supabase
+              .from("profiles")
+              .select("name")
+              .eq("email", m.sender_email)
+              .single();
+
+            const groupName = group?.name || "Group";
+            const senderName = senderProfile?.name || m.sender_email;
+
+            let notifBody = m.content;
+            if (notifBody?.startsWith("[IMAGE]")) notifBody = "📷 Photo";
+            else if (notifBody?.startsWith("[AUDIO]")) notifBody = "🎤 Voice message";
+
+            showNotification(groupName, `${senderName}: ${notifBody}`, groupId, true);
+          } catch (err) {
+            console.error("Group notification failed:", err);
+          }
         }
       )
       .subscribe();
@@ -7228,7 +7266,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.email, activeContact, preferences.muted]);
+  }, [user?.email, preferences.muted, preferences.notifications_enabled]);
 
   // 🔌 Socket.IO: Listen for typing events
   useEffect(() => {
@@ -7873,7 +7911,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
     }
   };
     // 🔥 Ref banaya taaki notification click pe hamesha latest handleSelectContact use ho, stale closure na ho
-  const handleSelectContactRef = useRef(handleSelectContact);
+    // 🔥 handleSelectContact ka latest reference update karo (ref upar already declared hai)
   useEffect(() => {
     handleSelectContactRef.current = handleSelectContact;
   });

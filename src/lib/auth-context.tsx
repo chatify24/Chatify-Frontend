@@ -37,12 +37,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 // 🔁 AUTO LOGIN + ONLINE SET
   useEffect(() => {
-    const getSession = async () => {
+    const getSession = async (retryCount = 0) => {
       try {
         const { data, error } = await supabase.auth.getSession();
 
         if (error) {
           console.log("[auth] getSession error (possibly offline):", error.message);
+          // 🔥 error aane par bhi retry karo, turant logged-out mat maano
+          if (retryCount < 3) {
+            setTimeout(() => getSession(retryCount + 1), 400);
+            return;
+          }
+          setIsLoading(false);
           return;
         }
 
@@ -69,12 +75,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           setIsAuthenticated(true);
           setupFcmToken(userId);
+          setIsLoading(false);
         } else {
+          // 🔥 KEY FIX: session null milne par turant "logged out" mat maano
+          // Cold start pe secure storage read hone mein time lag sakta hai
+          if (retryCount < 3) {
+            setTimeout(() => getSession(retryCount + 1), 400);
+            return;
+          }
+          // 3 retries ke baad bhi session nahi mila, tab hi maano truly logged out hai
           setUser(null);
           setIsAuthenticated(false);
+          setIsLoading(false);
         }
-      } finally {
-        setIsLoading(false);
+      } catch (err) {
+        console.error("[auth] getSession unexpected error:", err);
+        if (retryCount < 3) {
+          setTimeout(() => getSession(retryCount + 1), 400);
+        } else {
+          setIsLoading(false);
+        }
       }
     };
 

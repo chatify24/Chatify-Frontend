@@ -7,17 +7,26 @@ interface NoInternetProps {
   onVisibilityChange?: (isOffline: boolean) => void;
 }
 
+// 🔥 Render free tier cold-start ke liye timeout badhaya (5s -> 10s)
+const HEALTH_CHECK_TIMEOUT = 10000;
+
+// 🔥 Agar response isse zyada time le (but fail na ho), "poor connection" dikhao
+const SLOW_THRESHOLD_MS = 2500;
+
 const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetProps) => {
   const [visible, setVisible] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryFailed, setRetryFailed] = useState(false);
+  const [isPoorConnection, setIsPoorConnection] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const checkConnection = async () => {
+      const start = performance.now();
+
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
+        const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT);
 
         const res = await fetch(
           `https://chatify-backend-mrlh.onrender.com/health?_=${Date.now()}`,
@@ -27,12 +36,17 @@ const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetPro
 
         if (!res.ok) throw new Error("Not ok");
 
+        const elapsed = performance.now() - start;
+
         setVisible(false);
         setIsRetrying(false);
         setRetryFailed(false);
+        // 🔥 Request succeed hua but slow tha -> poor connection warning
+        setIsPoorConnection(elapsed > SLOW_THRESHOLD_MS);
         onVisibilityChange?.(false);
       } catch {
         setVisible(true);
+        setIsPoorConnection(false);
         onVisibilityChange?.(true);
       }
     };
@@ -50,13 +64,14 @@ const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetPro
     };
 
     const handleOnline = () => {
-  checkConnection();
-  window.dispatchEvent(new Event("app-reconnected"));
-};
+      checkConnection();
+      window.dispatchEvent(new Event("app-reconnected"));
+    };
 
     const handleOffline = () => {
       setVisible(true);
       setRetryFailed(false);
+      setIsPoorConnection(false);
       onVisibilityChange?.(true);
     };
 
@@ -79,9 +94,11 @@ const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetPro
     setRetryFailed(false);
 
     timeoutRef.current = setTimeout(async () => {
+      const start = performance.now();
+
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
+        const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT);
 
         const res = await fetch(
           `https://chatify-backend-mrlh.onrender.com/health?_=${Date.now()}`,
@@ -91,9 +108,12 @@ const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetPro
 
         if (!res.ok) throw new Error("Not ok");
 
+        const elapsed = performance.now() - start;
+
         setVisible(false);
         setIsRetrying(false);
         setRetryFailed(false);
+        setIsPoorConnection(elapsed > SLOW_THRESHOLD_MS);
         onVisibilityChange?.(false);
       } catch {
         setIsRetrying(false);
@@ -113,6 +133,30 @@ const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetPro
       >
         {children}
       </div>
+
+      {/* 🔥 Poor connection banner — sirf tab jab overlay nahi dikh raha */}
+      {!visible && isPoorConnection && (
+        <div
+          className="noinet-shake"
+          style={{
+            position: "fixed",
+            top: 12,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 9998,
+            backgroundColor: "rgba(239, 68, 68, 0.12)",
+            border: "1px solid #ef4444",
+            color: "#ef4444",
+            padding: "6px 14px",
+            borderRadius: 999,
+            fontSize: 13,
+            fontWeight: 600,
+            fontFamily: "'Segoe UI', system-ui, sans-serif",
+          }}
+        >
+          Network connection is poor
+        </div>
+      )}
 
       {visible && (
         <div
@@ -177,6 +221,18 @@ const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetPro
       <style>{`
         @keyframes noinet-spin {
           to { transform: rotate(360deg); }
+        }
+
+        @keyframes noinet-shake {
+          0%, 100% { transform: translateX(-50%) translateY(0); }
+          20% { transform: translateX(-50%) translateX(-3px); }
+          40% { transform: translateX(-50%) translateX(3px); }
+          60% { transform: translateX(-50%) translateX(-2px); }
+          80% { transform: translateX(-50%) translateX(2px); }
+        }
+
+        .noinet-shake {
+          animation: noinet-shake 0.4s ease-in-out;
         }
       `}</style>
     </>
