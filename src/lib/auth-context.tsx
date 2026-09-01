@@ -55,11 +55,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (data.session?.user) {
           const userId = data.session.user.id;
 
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", userId)
-            .single();
+          const { data: profile, error: profileError } = await supabase
+  .from("profiles")
+  .select("*")
+  .eq("id", userId)
+  .single();
+   if (profileError || !profile) {
+    console.log("[auth] profile fetch failed, retrying:", profileError?.message);
+    if (retryCount < 3) {
+      setTimeout(() => getSession(retryCount + 1), 400);
+      return;
+    }
+    setIsLoading(false);
+    return;
+  }
 
           await supabase
             .from("profiles")
