@@ -7,62 +7,70 @@ interface NoInternetProps {
   onVisibilityChange?: (isOffline: boolean) => void;
 }
 
-// 🔥 Render free tier cold-start ke liye timeout badhaya (5s -> 10s)
 const HEALTH_CHECK_TIMEOUT = 10000;
-
-// 🔥 Agar response isse zyada time le (but fail na ho), "poor connection" dikhao
 const SLOW_THRESHOLD_MS = 2500;
 
 const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetProps) => {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(!navigator.onLine);
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryFailed, setRetryFailed] = useState(false);
   const [isPoorConnection, setIsPoorConnection] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
 
-  useEffect(() => {
-    const checkConnection = async () => {
-      const start = performance.now();
+  const checkConnection = useCallback(async () => {
+    const start = performance.now();
 
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT);
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT);
 
-        const res = await fetch(
-          `https://chatify-backend-mrlh.onrender.com/health?_=${Date.now()}`,
-          { method: "GET", cache: "no-store", signal: controller.signal }
-        );
-        clearTimeout(timeout);
+      const res = await fetch(
+        `https://chatify-backend-mrlh.onrender.com/health?_=${Date.now()}`,
+        { method: "GET", cache: "no-store", signal: controller.signal }
+      );
+      clearTimeout(timeout);
 
-        if (!res.ok) throw new Error("Not ok");
+      if (!res.ok) throw new Error("Not ok");
 
-        const elapsed = performance.now() - start;
+      const elapsed = performance.now() - start;
 
+      setVisible(false);
+      setIsRetrying(false);
+      setRetryFailed(false);
+      setIsPoorConnection(elapsed > SLOW_THRESHOLD_MS);
+      onVisibilityChange?.(false);
+    } catch {
+      // 🔥 Backend fail hua (cold-start/down) — agar browser abhi bhi
+      // "online" bol raha hai, to ye internet ka issue nahi hai.
+      // Full "No Internet" screen mat dikhao, sirf poor-connection banner.
+      if (navigator.onLine) {
         setVisible(false);
-        setIsRetrying(false);
-        setRetryFailed(false);
-        // 🔥 Request succeed hua but slow tha -> poor connection warning
-        setIsPoorConnection(elapsed > SLOW_THRESHOLD_MS);
+        setIsPoorConnection(true);
         onVisibilityChange?.(false);
-      } catch {
+      } else {
         setVisible(true);
         setIsPoorConnection(false);
         onVisibilityChange?.(true);
       }
-    };
+    }
+  }, [onVisibilityChange]);
 
+  useEffect(() => {
+    // Initial check on mount
     checkConnection();
 
-    // Poll every 4 seconds — Android WebView doesn't fire online/offline reliably
-    const pollInterval = setInterval(checkConnection, 4000);
+    // 🔥 Polling hata di — ye galti se "No Internet" trigger karti thi
+    // jab backend cold-start ho raha hota tha (Render free tier).
 
-    // Recheck immediately when app comes back to foreground (Android resume)
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
         checkConnection();
       }
     };
 
+    // 🔥 Real browser network events hi primary source of truth
     const handleOnline = () => {
       checkConnection();
       window.dispatchEvent(new Event("app-reconnected"));
@@ -80,13 +88,12 @@ const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetPro
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      clearInterval(pollInterval);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       document.removeEventListener("visibilitychange", handleVisibility);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, []);
+  }, [checkConnection, onVisibilityChange]);
 
   const handleRetry = useCallback(() => {
     if (isRetrying) return;
@@ -120,7 +127,7 @@ const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetPro
         setRetryFailed(true);
       }
     }, 800);
-  }, [isRetrying]);
+  }, [isRetrying, onVisibilityChange]);
 
   return (
     <>
@@ -134,7 +141,6 @@ const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetPro
         {children}
       </div>
 
-      {/* 🔥 Poor connection banner — sirf tab jab overlay nahi dikh raha */}
       {!visible && isPoorConnection && (
         <div
           className="noinet-shake"
