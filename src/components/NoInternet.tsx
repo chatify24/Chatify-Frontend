@@ -193,7 +193,7 @@ const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetPro
                   color: "var(--foreground, #1a1a1a)",
                 }}
               >
-                No Internet Access
+                No Network Access
               </p>
 
               <p
