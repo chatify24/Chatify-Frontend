@@ -3144,10 +3144,20 @@ const ChatArea = React.memo(({
 }) => {
   // 🎤 Mic recording state
   const [isRecording, setIsRecording] = useState(false);
-   const [isAndroidApp] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return "__TAURI_INTERNALS__" in window && /android/i.test(navigator.userAgent || "");
+const [isAndroidApp, setIsAndroidApp] = useState(false);
+
+useEffect(() => {
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
+
+  import("@tauri-apps/plugin-os").then(async ({ platform }) => {
+    try {
+      const p = await platform();
+      setIsAndroidApp(p === "android");
+    } catch (err) {
+      console.error("Platform check failed:", err);
+    }
   });
+}, []);
   const [isDark, setIsDark] = useState(
     document.documentElement.classList.contains("dark")
   );

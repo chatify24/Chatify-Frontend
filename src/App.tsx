@@ -217,17 +217,7 @@ function AppContent({
    * 🔥 Fallback safety net:
    * Agar session check splash se zyada time le raha hai
    */
-  if (isLoading) {
-    return (
-      <div className="flex h-screen w-screen flex-col items-center justify-center gap-2 bg-background">
-        <div className="h-8 w-8 border-4 border-muted border-t-primary rounded-full animate-spin"></div>
-
-        <p className="text-sm text-muted-foreground">
-          Loading...
-        </p>
-      </div>
-    );
-  }
+  
 
   return (
     <>
@@ -245,17 +235,22 @@ function AppContent({
 
      <Routes>
   <Route
-    path="/"
-    element={
-      isAuthenticated ? (
-        <Navigate to={isProfileComplete ? "/chat" : "/profile"} replace />
-      ) : (
-        <NoInternet onVisibilityChange={setIsOffline}>
-          {isTauriApp ? <Auth /> : <Welcome />}
-        </NoInternet>
-      )
-    }
-  />
+  path="/"
+  element={
+    !isTauriApp ? (
+      // 🔥 Web pe "/" hamesha Welcome dikhayega, chahe user authenticated ho ya nahi
+      <NoInternet onVisibilityChange={setIsOffline}>
+        <Welcome />
+      </NoInternet>
+    ) : isAuthenticated ? (
+      <Navigate to={isProfileComplete ? "/chat" : "/profile"} replace />
+    ) : (
+      <NoInternet onVisibilityChange={setIsOffline}>
+        <Auth />
+      </NoInternet>
+    )
+  }
+/>
 
   <Route
     path="/auth"

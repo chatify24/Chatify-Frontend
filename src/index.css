@@ -196,4 +196,9 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
   height: 100vh;
   height: 100dvh;
   height: var(--app-height, 100dvh);
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  top: 0;
+  left: 0;
 }

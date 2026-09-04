@@ -230,16 +230,16 @@ const NoInternet = ({ children, onReconnect, onVisibilityChange }: NoInternetPro
         }
 
         @keyframes noinet-shake {
-          0%, 100% { transform: translateX(-50%) translateY(0); }
-          20% { transform: translateX(-50%) translateX(-3px); }
-          40% { transform: translateX(-50%) translateX(3px); }
-          60% { transform: translateX(-50%) translateX(-2px); }
-          80% { transform: translateX(-50%) translateX(2px); }
-        }
+  0%, 11.76%, 100% { transform: translateX(-50%) translateY(0); }
+  2.35%  { transform: translateX(-50%) translateX(-3px); }
+  4.7%   { transform: translateX(-50%) translateX(3px); }
+  7.06%  { transform: translateX(-50%) translateX(-2px); }
+  9.41%  { transform: translateX(-50%) translateX(2px); }
+}
 
-        .noinet-shake {
-          animation: noinet-shake 0.4s ease-in-out;
-        }
+       .noinet-shake {
+  animation: noinet-shake 3.4s ease-in-out infinite;
+}
       `}</style>
     </>
   );
