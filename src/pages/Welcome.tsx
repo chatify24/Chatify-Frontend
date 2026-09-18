@@ -219,7 +219,7 @@ export default function Welcome() {
     setTimeout(() => {
       const link = document.createElement('a');
       link.href =
-        'https://github.com/chatify24/Chatify/releases/download/v1.3.8/Chatify_1.3.8_x64-setup.exe';
+        'https://github.com/chatify24/Chatify/releases/download/v2.9.20/Chatify_2.9.20_x64-setup.exe';
       link.download = 'Chatify.exe';
       document.body.appendChild(link);
       link.click();

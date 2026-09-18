@@ -234,7 +234,7 @@ function AppContent({
       {showThemeToggle && <ThemeToggle />}
 
      <Routes>
-  <Route
+<Route
   path="/"
   element={
     !isTauriApp ? (

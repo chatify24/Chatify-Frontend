@@ -2,7 +2,7 @@
 // Add these NEW imports (keep all existing ones):
 import EmojiPicker, { EmojiClickData, Theme } from "emoji-picker-react";
 import React, { useState, useRef, useEffect } from "react";
-import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
+import { onOpenUrl, getCurrent } from '@tauri-apps/plugin-deep-link';
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme-context";
 import { useSocket } from "@/lib/socket-context";
@@ -2168,8 +2168,8 @@ useEffect(() => {
       )}
 
       {/* Header */}
-      <div
-        className="flex items-center justify-between border-b px-5 py-4"
+           <div
+        className="flex items-center justify-between border-b px-5 pt-4 pb-6 relative z-10"
         style={{ paddingTop: 'calc(0.25rem + env(safe-area-inset-top, 0px))' }}
       >
         <div className="flex items-center gap-3">
@@ -3346,27 +3346,18 @@ const groupPhotoInputRef = useRef<HTMLInputElement | null>(null);
 useEffect(() => {
   if (!window.visualViewport) return;
 
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-
   const setHeight = () => {
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      document.documentElement.style.setProperty(
-        '--app-height',
-        `${window.visualViewport!.height}px`
-      );
-    }, 100); // 🔥 100ms debounce - chhote fluctuations ignore honge
+    document.documentElement.style.setProperty(
+      '--app-height',
+      `${window.visualViewport!.height}px`
+    );
   };
 
-  // Pehli baar turant set karo (no debounce needed on mount)
-  document.documentElement.style.setProperty(
-    '--app-height',
-    `${window.visualViewport.height}px`
-  );
+  // Pehli baar turant set karo
+  setHeight();
 
   window.visualViewport.addEventListener('resize', setHeight);
   return () => {
-    if (debounceTimer) clearTimeout(debounceTimer);
     window.visualViewport.removeEventListener('resize', setHeight);
   };
 }, []);
@@ -4215,8 +4206,8 @@ if (!contact) {
 
       {/* Chat Header */}
 
-      <div
-        className="flex items-center justify-between border-b px-6 py-3"
+<div
+  className="flex items-center justify-between border-b px-6 py-3 relative z-10"
         style={{ paddingTop: 'calc(0.25rem + env(safe-area-inset-top, 0px))' }}
       >
         <div className="flex items-center gap-3">
@@ -4971,14 +4962,18 @@ if (!contact) {
             <Input
               ref={inputRef}
               placeholder={
-                isRecording
-                  ? `🎤 Recording... ${recordingTime}s`
-                  : isBlockedByMe || isBlockedByThem
-                    ? isBlockedByThem
-                      ? "You have been blocked by this user"
-                      : "You blocked this user"
-                    : "Type a message..."
-              }
+  isRecording
+    ? `🎤 Recording... ${recordingTime}s`
+    : isBlockedByMe || isBlockedByThem
+      ? isAndroidApp
+        ? isBlockedByThem
+          ? "Blocked You"
+          : "User blocked"
+        : isBlockedByThem
+          ? "You have been blocked by this user"
+          : "You blocked this user"
+      : "Type a message..."
+}
               value={isRecording ? "" : input}
               disabled={isBlockedByMe || isBlockedByThem || isRecording}
               onChange={(e) => {
@@ -6399,30 +6394,43 @@ useEffect(() => {
 
   loadContactOrder();
 }, [user?.email]);
+const handleDeepLink = async (urlString: string) => {
+  const parsed = new URL(urlString);
+  const targetId = parsed.searchParams.get('id');
+  const isGroup = parsed.searchParams.get('group') === 'true';
+  if (!targetId) return;
+
+  if (isGroup) {
+    const { data: group } = await supabase.from("groups").select("*").eq("id", targetId).single();
+    if (group) {
+      handleSelectContact({
+        id: group.id,
+        name: group.name,
+        avatar: group.avatar || "",
+        email: group.id,
+        isGroup: true,
+      } as any);
+    }
+  } else {
+    const contact = friends.find((f) => f.id === targetId || f.email === targetId);
+    if (contact) handleSelectContact(contact);
+  }
+};
+
 useEffect(() => {
   if (!isTauriApp) return;
+  if (friends.length === 0) return; // 🔥 friends load hone ka wait karo
 
-  const unlistenPromise = onOpenUrl(async (urls) => {
-    const parsed = new URL(urls[0]);
-    const targetId = parsed.searchParams.get('id');
-    const isGroup = parsed.searchParams.get('group') === 'true';
-    if (!targetId) return;
-
-    if (isGroup) {
-      const { data: group } = await supabase.from("groups").select("*").eq("id", targetId).single();
-      if (group) {
-        handleSelectContact({
-          id: group.id,
-          name: group.name,
-          avatar: group.avatar || "",
-          email: group.id,
-          isGroup: true,
-        } as any);
-      }
-    } else {
-      const contact = friends.find((f) => f.id === targetId || f.email === targetId);
-      if (contact) handleSelectContact(contact);
+  // 🔥 COLD START FIX: agar app killed state se khula ho to initial URL check karo
+  getCurrent().then((urls) => {
+    if (urls && urls.length > 0) {
+      handleDeepLink(urls[0]);
     }
+  }).catch((err) => console.error("getCurrent deep link failed:", err));
+
+  // 🔥 LIVE listener: agar app already khula ho aur notification click ho
+  const unlistenPromise = onOpenUrl(async (urls) => {
+    handleDeepLink(urls[0]);
   });
 
   return () => { unlistenPromise.then((unlisten) => unlisten()); };
