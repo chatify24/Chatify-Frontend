@@ -18,7 +18,7 @@ const CURRENT_VERSION = '1.2.2';
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const { login, signup } = useAuth();
+    const { login, signup, isLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   useEffect(() => {
@@ -174,6 +174,13 @@ const handleSubmit = async (e: React.FormEvent) => {
     setLoading(false);
   }
 };
+    if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
+      </div>
+    );
+  }
 
 
   return (

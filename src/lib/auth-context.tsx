@@ -70,10 +70,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return;
   }
 
-          await supabase
+           supabase
             .from("profiles")
             .update({ last_seen: new Date().toISOString() })
-            .eq("id", userId);
+            .eq("id", userId)
+            .then(() => {});
 
           setUser({
             name: profile?.name || "",
@@ -83,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
 
           setIsAuthenticated(true);
-          setupFcmToken(userId);
+          
           setIsLoading(false);
         } else {
           // 🔥 KEY FIX: session null milne par turant "logged out" mat maano
@@ -143,41 +144,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
   
 
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const { data } = await supabase.auth.getUser();
-      const userId = data.user?.id;
 
-      if (userId) {
-        await supabase
-          .from("profiles")
-          .update({ last_seen: new Date().toISOString() })
-          .eq("id", userId);
-      }
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, []);
-  const setupFcmToken = async (userId: string) => {
-  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
-  try {
-    const { checkPermissions, requestPermissions, register, getToken } = await import("tauri-plugin-fcm");
-    let permission = await checkPermissions();
-    if (permission === "prompt" || permission === "prompt-with-rationale") {
-      permission = await requestPermissions();
-    }
-    if (permission === "granted") {
-      await register();
-      const { token } = await getToken();
-      if (token) {
-        await supabase.from("profiles").update({ fcm_token: token }).eq("id", userId);
-        console.log("[fcm] token saved successfully");
-      }
-    }
-  } catch (err) {
-    console.error("FCM setup failed:", err);
-  }
-};
+ 
 
   // 🔐 SIGNUP
   const signup = async (email: string, password: string): Promise<AuthResult> => {
@@ -297,29 +265,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     setIsAuthenticated(true);
-    setupFcmToken(userId);
+    
 
     
-    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-      import("tauri-plugin-fcm").then(async ({ checkPermissions, requestPermissions, register, getToken }) => {
-        try {
-          let permission = await checkPermissions();
-          if (permission === "prompt" || permission === "prompt-with-rationale") {
-            permission = await requestPermissions();
-          }
-          if (permission === "granted") {
-            await register();
-            const { token } = await getToken();
-            if (token) {
-              await supabase.from("profiles").update({ fcm_token: token }).eq("id", userId);
-              console.log("[fcm] token saved successfully");
-            }
-          }
-        } catch (err) {
-          console.error("FCM setup failed:", err);
-        }
-      });
-    }
+    
 
     return { success: true, profileComplete: !!profile?.name };
   };

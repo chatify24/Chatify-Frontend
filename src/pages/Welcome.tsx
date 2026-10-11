@@ -156,7 +156,7 @@ export default function Welcome() {
     const [isSendingContact, setIsSendingContact] = useState(false);
   const [activeNav, setActiveNav] = useState('home');
   const navDropdownRef = useRef<HTMLDivElement>(null);
-  const [step, setStep] = useState<'confirm' | 'downloading' | 'ready' | 'comingSoon' | 'androidUnavailable'>('confirm');
+  const [step, setStep] = useState<'confirm' | 'downloading' | 'ready' | 'comingSoon'>('confirm');
   const [isDownloading, setIsDownloading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [downloadType, setDownloadType] = useState<DownloadType>('windows');
@@ -204,10 +204,8 @@ export default function Welcome() {
 
   const handleDeviceClick = (type: DownloadType) => {
     setDownloadType(type);
-    if (type === 'windows') {
+    if (type === 'windows' || type === 'android') {
       setStep('confirm');
-    } else if (type === 'android') {
-      setStep('androidUnavailable');
     } else {
       setStep('comingSoon');
     }
@@ -219,7 +217,7 @@ export default function Welcome() {
     setTimeout(() => {
       const link = document.createElement('a');
       link.href =
-        'https://github.com/chatify24/Chatify/releases/download/v2.9.20/Chatify_2.9.20_x64-setup.exe';
+        'https://github.com/chatify24/Chatify/releases/download/v2.9.29/Chatify_2.9.29_x64-setup.exe';
       link.download = 'Chatify.exe';
       document.body.appendChild(link);
       link.click();
@@ -234,7 +232,7 @@ export default function Welcome() {
     setTimeout(() => {
       const link = document.createElement('a');
       link.href =
-        'https://github.com/chatify24/chatify_android/releases/download/v2.9.8/Chatify.apk';
+        'https://github.com/chatify24/chatify_android/releases/download/v2.9.29/Chatify.apk';
       link.download = 'Chatify.apk';
       document.body.appendChild(link);
       link.click();
@@ -669,26 +667,6 @@ const handleContactSubmit = async (e: React.FormEvent) => {
                   <h3 className="text-xl font-semibold mb-2">This isn't ready yet</h3>
                   <p className="text-sm text-neutral-500">
                     We're still building this version of Chatify. Thanks for checking back.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowPopup(false)}
-                  className="w-full px-6 py-3 rounded-xl border border-neutral-200 font-semibold hover:bg-neutral-50 transition-colors"
-                >
-                  Got it
-                </button>
-              </div>
-            )}
-
-            {step === 'androidUnavailable' && (
-              <div className="p-8 text-center space-y-6">
-                <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-[#3DDC84]/10 mx-auto">
-                  <AndroidIcon className="h-7 w-7 text-[#3DDC84]" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold mb-2">This app is currently unavailable</h3>
-                  <p className="text-sm text-neutral-500">
-                    Our team is working on making Chatify better for Android. Thanks for your patience!
                   </p>
                 </div>
                 <button

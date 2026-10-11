@@ -16,8 +16,12 @@
     "fs:allow-appdata-read",
     "fs:allow-appdata-write",
     "os:default",
-    "notification:default",
+    
     "opener:default",
-    "fcm:default"
+    
+    "core:tray:default",
+    "core:menu:default"
+
+
   ]
 }

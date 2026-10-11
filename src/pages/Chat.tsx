@@ -1,9 +1,11 @@
-"use client";
+﻿"use client";
 // Add these NEW imports (keep all existing ones):
 import EmojiPicker, { EmojiClickData, Theme } from "emoji-picker-react";
 import React, { useState, useRef, useEffect } from "react";
 import { onOpenUrl, getCurrent } from '@tauri-apps/plugin-deep-link';
 import { useAuth } from "@/lib/auth-context";
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { useTheme } from "@/lib/theme-context";
 import { useSocket } from "@/lib/socket-context";
 import { contacts, generateMessages, type Contact, type Message } from "@/lib/chat-data";
@@ -15,7 +17,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
 import { User, Shield, Lock, Sun, Moon, CheckCircle, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/supabaseClient";
-import { sendNotification, isPermissionGranted, requestPermission, onAction } from '@tauri-apps/plugin-notification';
 import { Trash2 } from "lucide-react";
 import { savePrefs } from "@/lib/savePrefs";
 import {
@@ -34,7 +35,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
-
+import { getCurrentWindow } from '@tauri-apps/api/window';
 const normalizeName = (name?: string) => {
   if (!name) return "";
   // Remove parenthesized suffixes like (You) and any trailing labels that are not part of the actual name.
@@ -90,26 +91,7 @@ const getInitials = (name?: string) => {
     .map((part) => part.charAt(0).toUpperCase());
   return initials.join("");
 };
-const showNotification = async (title: string, body: string, contactId?: string, isGroup: boolean = false) => {
-  try {
-    let granted = await isPermissionGranted();
-    if (!granted) {
-      const permission = await requestPermission();
-      granted = permission === 'granted';
-    }
-    if (granted) {
-      sendNotification({
-        title,
-        body,
-        channelId: 'messages',
-        silent: false,
-        extra: { contactId, isGroup: String(isGroup) },
-      });
-    }
-  } catch (err) {
-    console.error("Notification failed:", err);
-  }
-};
+
 
 const getFirstName = (name?: string) => {
   const normalized = normalizeName(name);
@@ -160,6 +142,12 @@ const formatTypingNames = (names: string[]) => {
   if (names.length === 2) return `${names[0]} and ${names[1]} are typing...`;
   if (names.length === 3) return `${names[0]}, ${names[1]} and ${names[2]} are typing...`;
   return `${names[0]}, ${names[1]} and ${names.length - 2} others are typing...`;
+};
+const getReplyPreviewText = (text?: string) => {
+  if (!text) return "";
+  if (text.startsWith("[IMAGE]")) return "📷 Photo";
+  if (text.startsWith("[AUDIO]")) return "🎤 Voice message";
+  return text;
 };
 
 
@@ -691,16 +679,7 @@ const SettingsModal = ({
             {/* Notifications Tab */}
             {activeTab === 'notifications' && (
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors">
-                  <div>
-                    <p className="font-medium text-sm">Show Notifications</p>
-                    <p className="text-xs text-muted-foreground">Get popup alerts for new messages</p>
-                  </div>
-                  <Toggle
-                    checked={localPrefs.notifications_enabled}
-                    onChange={(v) => updatePreference('notifications_enabled', v)}
-                  />
-                </div>
+                
 
                 <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:bg-muted transition-colors">
                   <div>
@@ -1348,6 +1327,7 @@ const ChatSidebar = ({
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [loadingStates, setLoadingStates] = useState({});
+  const lastFriendsKeyRef = useRef("");
   const [acceptedFriends, setAcceptedFriends] = useState<any[]>(() => {
     try {
       const cached = localStorage.getItem(`friends_cache_${authUser?.email || ""}`);
@@ -1519,7 +1499,7 @@ const ChatSidebar = ({
     const interval = setInterval(() => {
       fetchPendingRequests();
       fetchSentRequests(); // 🔥 NEW
-    }, 5000);
+    }, 30000);
 
     return () => {
       subscription.unsubscribe();
@@ -1743,18 +1723,16 @@ useEffect(() => {
           })
           .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
-        setAcceptedFriends((prev) => {
-          const prevKey = prev.map(f => `${f.id}|${f.last_seen}|${f.name}|${f.avatar}`).join(",");
-          const newKey = friends.map(f => `${f.id}|${f.last_seen}|${f.name}|${f.avatar}`).join(",");
+            const newKey = friends
+          .map((f) => `${f.id}|${f.last_seen}|${f.name}|${f.avatar}`)
+          .join(",");
 
-          if (prevKey === newKey) return prev;
+        if (newKey === lastFriendsKeyRef.current) return;
+        lastFriendsKeyRef.current = newKey;
 
-          if (userEmail) {
-            localStorage.setItem(`friends_cache_${userEmail}`, JSON.stringify(friends));
-          }
-          setFriends(friends);
-          return friends;
-        });
+        localStorage.setItem(`friends_cache_${userEmail}`, JSON.stringify(friends));
+        setFriends(friends);
+        setAcceptedFriends(friends);
       } catch (error) {
         console.error("Error fetching accepted friends:", error);
       }
@@ -1773,7 +1751,7 @@ useEffect(() => {
       )
       .subscribe();
 
-    const interval = setInterval(fetchAcceptedFriends, 3000);
+    const interval = setInterval(fetchAcceptedFriends, 30000);
 
     return () => {
       subscription.unsubscribe();
@@ -1889,7 +1867,7 @@ useEffect(() => {
     const friend = acceptedFriends.find(f => f.id === contactId);
     const key = (friend?.email || contactId || "").toLowerCase().trim();
     const time = contactOrder[key] || 0;
-    console.log("[SORT]", contactId, "sortTime =", time);
+    
     return time;
   };
 
@@ -3145,7 +3123,7 @@ const ChatArea = React.memo(({
   // 🎤 Mic recording state
   const [isRecording, setIsRecording] = useState(false);
 const [isAndroidApp, setIsAndroidApp] = useState(false);
-
+const [toast, setToast] = useState(null);
 useEffect(() => {
   if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
 
@@ -3342,23 +3320,25 @@ const groupPhotoInputRef = useRef<HTMLInputElement | null>(null);
     return () => observer.disconnect();
   }, []);
 
-  // 🔥 YE NAYA ADD KARO
 useEffect(() => {
   if (!window.visualViewport) return;
 
+  let raf = 0;
   const setHeight = () => {
-    document.documentElement.style.setProperty(
-      '--app-height',
-      `${window.visualViewport!.height}px`
-    );
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      document.documentElement.style.setProperty(
+        '--app-height',
+        `${window.visualViewport!.height}px`
+      );
+    });
   };
 
-  // Pehli baar turant set karo
   setHeight();
-
   window.visualViewport.addEventListener('resize', setHeight);
   return () => {
-    window.visualViewport.removeEventListener('resize', setHeight);
+    cancelAnimationFrame(raf);
+    window.visualViewport!.removeEventListener('resize', setHeight);
   };
 }, []);
   useEffect(() => {
@@ -3523,6 +3503,10 @@ useEffect(() => {
    finally {
     setLoadingMembers(false);
   }
+};
+const showToast = (message, type = "success") => {
+  setToast({ message, type });
+  setTimeout(() => setToast(null), 2500);
 };
 const handleGroupPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
@@ -4705,8 +4689,8 @@ if (!contact) {
                     <p className={`font-semibold truncate ${msg.isOwn ? "text-white/80" : "text-primary"}`}>
                       {msg.replyTo.senderName}
                     </p>
-                    <p className={`truncate max-w-[200px] ${msg.isOwn ? "text-white/70" : "text-muted-foreground"}`}>
-                      {msg.replyTo.text}
+                                        <p className={`truncate max-w-[200px] ${msg.isOwn ? "text-white/70" : "text-muted-foreground"}`}>
+                      {getReplyPreviewText(msg.replyTo.text)}
                     </p>
                   </div>
                 )}
@@ -4899,8 +4883,8 @@ if (!contact) {
                 <p className="text-xs font-semibold text-primary">
                   Replying to {contact?.name}
                 </p>
-                <p className="text-sm text-muted-foreground truncate">
-                  {replyTo.isDeleted ? "message deleted" : replyTo.text}
+                                <p className="text-sm text-muted-foreground truncate">
+                  {replyTo.isDeleted ? "message deleted" : getReplyPreviewText(replyTo.text)}
                 </p>
               </div>
             </div>
@@ -5070,83 +5054,176 @@ if (!contact) {
       </div>
 
       {/* Message Context Menu */}
-      {contextMenu.messageId && (
-        <MessageContextMenu
-          isOpen={contextMenu.isOpen}
-          position={contextMenu.position}
-          onClose={() => setContextMenu({ ...contextMenu, isOpen: false })}
+{contextMenu.messageId && (
+  <MessageContextMenu
+    isOpen={contextMenu.isOpen}
+    position={contextMenu.position}
+    onClose={() => setContextMenu({ ...contextMenu, isOpen: false })}
 
-          onCopy={() => {
-            if (contextMenu.messageId) {
-              const message = messages.find((m) => m.id === contextMenu.messageId);
-              if (message && message.text) navigator.clipboard.writeText(message.text);
-            }
-            setContextMenu({ ...contextMenu, isOpen: false });
-          }}
+    onCopy={() => {
+      if (contextMenu.messageId) {
+        const message = messages.find((m) => m.id === contextMenu.messageId);
 
-          onEdit={() => {
-            const msg = messages.find(m => m.id === contextMenu.messageId);
-            if (!msg) return;
-            setEditMessage(msg);
-            setEditText(msg.text);
-            setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, messageId: null });
-          }}
+        if (message && message.text) {
+          navigator.clipboard.writeText(message.text)
+            .then(() => showToast("Message copied"))
+            .catch(() => showToast("Copy failed ❌", "error"));
+        }
+      }
 
-          onPin={() => {
-            if (contextMenu.messageId) {
-              onPinMessage(contextMenu.messageId);
-              setContextMenu({ ...contextMenu, isOpen: false });
-            }
-          }}
+      setContextMenu({ ...contextMenu, isOpen: false });
+    }}
 
-          onDeleteForMe={() => {
-            if (contextMenu.messageId) {
-              onDeleteForMe(contextMenu.messageId);
-              setContextMenu({ ...contextMenu, isOpen: false });
-            }
-          }}
+    // 🔥 IMAGE CHECK
+    isImage={
+      messages.find((m) => m.id === contextMenu.messageId)?.text?.startsWith("[IMAGE]") || false
+    }
 
-          onDeleteForEveryone={() => {
-            if (contextMenu.messageId) {
-              onDeleteForEveryone(contextMenu.messageId);
-              setContextMenu({ ...contextMenu, isOpen: false });
-            }
-          }}
+    // 📥 DOWNLOAD IMAGE
+onDownloadImage={async () => {
+  const message = messages.find((m) => m.id === contextMenu.messageId);
 
-          onReply={() => {
-            if (contextMenu.messageId) {
-              const message = messages.find((m) => m.id === contextMenu.messageId);
-              if (message) {
-                handleReply(message);
-                setContextMenu({ ...contextMenu, isOpen: false });
-              }
-            }
-          }}
+  if (!message?.text?.startsWith("[IMAGE]")) return;
 
-          onForward={() => {
-            if (contextMenu.messageId) {
-              const message = messages.find((m) => m.id === contextMenu.messageId);
-              if (message && !message.isDeleted) {
-                handleForward(message);
-                setContextMenu({ ...contextMenu, isOpen: false });
-              }
-            }
-          }}
+  const imageUrl = message.text.replace(/\[\/?IMAGE\]/g, "").trim();
 
+  try {
+    const response = await fetch(imageUrl);
+    const blob = await response.blob();
 
-          onSelect={() => {
-            if (contextMenu.messageId) {
-              setSelectionMode(true);
-              setSelectedMessages(new Set([contextMenu.messageId]));
-              setContextMenu({ ...contextMenu, isOpen: false });
-            }
-          }}
+    if (blob.size === 0) {
+      throw new Error("Empty blob received");
+    }
 
-          isOwn={messages.find((m) => m.id === contextMenu.messageId)?.isOwn || false}
-          isPinned={contextMenu.messageId ? pinnedMessages.has(contextMenu.messageId) : false}
-          isSelfChat={contact?.id === "self"}
-        />
-      )}
+    // Blob ke actual MIME type se extension nikalo
+    const extension = blob.type.split("/")[1] || "jpg"; // e.g. "png", "jpeg", "webp"
+    const fileName = `image-${Date.now()}.${extension}`;
+
+    const blobUrl = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = fileName;
+
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(blobUrl);
+
+    console.log("✅ Image downloaded");
+    showToast(`Image Saved as "${fileName}" in Downloads folder`);
+  } catch (error) {
+    console.error("❌ Failed to download image:", error);
+    showToast("Failed to download image", "error");
+  }
+
+  setContextMenu({ ...contextMenu, isOpen: false });
+}}
+
+    onEdit={() => {
+      const msg = messages.find(m => m.id === contextMenu.messageId);
+      if (!msg) return;
+
+      setEditMessage(msg);
+      setEditText(msg.text);
+
+      setContextMenu({
+        isOpen: false,
+        position: { x: 0, y: 0 },
+        messageId: null
+      });
+    }}
+
+    onPin={() => {
+      if (contextMenu.messageId) {
+        onPinMessage(contextMenu.messageId);
+        setContextMenu({ ...contextMenu, isOpen: false });
+      }
+    }}
+
+    onDeleteForMe={() => {
+      if (contextMenu.messageId) {
+        onDeleteForMe(contextMenu.messageId);
+        setContextMenu({ ...contextMenu, isOpen: false });
+      }
+    }}
+
+    onDeleteForEveryone={() => {
+      if (contextMenu.messageId) {
+        onDeleteForEveryone(contextMenu.messageId);
+        setContextMenu({ ...contextMenu, isOpen: false });
+      }
+    }}
+
+    onReply={() => {
+      if (contextMenu.messageId) {
+        const message = messages.find((m) => m.id === contextMenu.messageId);
+
+        if (message) {
+          handleReply(message);
+          setContextMenu({ ...contextMenu, isOpen: false });
+        }
+      }
+    }}
+
+    onForward={() => {
+      if (contextMenu.messageId) {
+        const message = messages.find((m) => m.id === contextMenu.messageId);
+
+        if (message && !message.isDeleted) {
+          handleForward(message);
+          setContextMenu({ ...contextMenu, isOpen: false });
+        }
+      }
+    }}
+
+    onSelect={() => {
+      if (contextMenu.messageId) {
+        setSelectionMode(true);
+        setSelectedMessages(new Set([contextMenu.messageId]));
+
+        setContextMenu({
+          ...contextMenu,
+          isOpen: false
+        });
+      }
+    }}
+
+    isOwn={
+      messages.find((m) => m.id === contextMenu.messageId)?.isOwn || false
+    }
+
+    isPinned={
+      contextMenu.messageId
+        ? pinnedMessages.has(contextMenu.messageId)
+        : false
+    }
+
+    isSelfChat={contact?.id === "self"}
+  />
+)}
+
+{/* Toast UI - component ke return ke andar kahin bhi paste karo */}
+{toast && (
+  <div
+    style={{
+      position: "fixed",
+      bottom: 30,
+      left: "50%",
+      transform: "translateX(-50%)",
+      background: toast.type === "error" ? "#e53935" : "#323232",
+      color: "#fff",
+      padding: "10px 18px",
+      borderRadius: 8,
+      fontSize: 14,
+      zIndex: 9999,
+      boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+    }}
+  >
+    {toast.message}
+  </div>
+)}
 
       {/* Forward Message Dialog */}
       <AlertDialog open={forwardDialogOpen} onOpenChange={(open) => {
@@ -6255,10 +6332,13 @@ const groupTypingBroadcastRef = useRef<any>(null);  // 🔥 NEW
   const [filter, setFilter] = useState("All messages");
   const [logoutLoading, setLogoutLoading] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingEmitRef = useRef(0);
   const contactOrderSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 const contactOrderSeqRef = useRef(0);
  const activeContactRef = useRef<Contact | null>(null);
   const handleSelectContactRef = useRef<(contact: Contact) => void>(() => {});
+  const friendsRef = useRef<any[]>([]);
+const coldStartHandledRef = useRef(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [uid, setUid] = useState("");
@@ -6412,107 +6492,28 @@ const handleDeepLink = async (urlString: string) => {
       } as any);
     }
   } else {
-    const contact = friends.find((f) => f.id === targetId || f.email === targetId);
+    const contact = friendsRef.current.find((f) => f.id === targetId || f.email === targetId);
     if (contact) handleSelectContact(contact);
   }
 };
 
 useEffect(() => {
-  if (!isTauriApp) return;
-  if (friends.length === 0) return; // 🔥 friends load hone ka wait karo
+  if (!isTauriApp || friends.length === 0) return;
 
-  // 🔥 COLD START FIX: agar app killed state se khula ho to initial URL check karo
-  getCurrent().then((urls) => {
-    if (urls && urls.length > 0) {
-      handleDeepLink(urls[0]);
-    }
-  }).catch((err) => console.error("getCurrent deep link failed:", err));
+  if (!coldStartHandledRef.current) {
+    coldStartHandledRef.current = true;
+    getCurrent()
+      .then((urls) => { if (urls && urls.length > 0) handleDeepLink(urls[0]); })
+      .catch((err) => console.error("getCurrent deep link failed:", err));
+  }
 
-  // 🔥 LIVE listener: agar app already khula ho aur notification click ho
-  const unlistenPromise = onOpenUrl(async (urls) => {
-    handleDeepLink(urls[0]);
-  });
-
+  const unlistenPromise = onOpenUrl((urls) => handleDeepLink(urls[0]));
   return () => { unlistenPromise.then((unlisten) => unlisten()); };
 }, [friends]);
   // 🔥 Ref banaya taaki notification click pe hamesha latest handleSelectContact use ho, stale closure na ho
 
 
-useEffect(() => {
-  if (!isTauriApp) return;
 
-  let listener: { unregister: () => void } | undefined;
-
-  const setup = async () => {
-    listener = await onAction(async (performedAction: any) => {
-      // 🔥 FIX: extra ab performedAction.notification.extra mein hai
-      const notif = performedAction?.notification;
-      const contactId = notif?.extra?.contactId;
-      const isGroup =
-        notif?.extra?.isGroup === "true" || notif?.extra?.isGroup === true;
-
-      if (!contactId) return;
-
-      try {
-        if (isGroup) {
-          const { data: group, error } = await supabase
-            .from("groups")
-            .select("id, name, avatar, bio")
-            .eq("id", contactId)
-            .single();
-
-          if (error || !group) {
-            console.error("Notification click: group not found", error);
-            return;
-          }
-
-          handleSelectContactRef.current({
-            id: group.id,
-            name: group.name,
-            avatar: group.avatar || "",
-            email: group.id,
-            isGroup: true,
-            bio: group.bio,
-            lastMessage: "",
-            time: "",
-            unread: 0,
-          } as any);
-        } else {
-          const { data: profile, error } = await supabase
-            .from("profiles")
-            .select("id, name, email, avatar, uid, last_seen")
-            .eq("email", contactId)
-            .single();
-
-          if (error || !profile) {
-            console.error("Notification click: profile not found", error);
-            return;
-          }
-
-          handleSelectContactRef.current({
-            id: profile.email,
-            name: profile.name || "Unknown",
-            avatar: profile.avatar || "",
-            email: profile.email,
-            uid: profile.uid,
-            last_seen: profile.last_seen || null,
-            lastMessage: "",
-            time: "",
-            unread: 0,
-          } as any);
-        }
-      } catch (err) {
-        console.error("Notification click handling failed:", err);
-      }
-    });
-  };
-
-  setup();
-
-  return () => {
-    listener?.unregister();
-  };
-}, []);
 // 🔥 Realtime - dusre device pe order change ho toh yahan bhi turant reflect ho
 useEffect(() => {
   if (!user?.email) return;
@@ -6589,6 +6590,23 @@ useEffect(() => {
     supabase.removeChannel(channel);
   };
 }, []);
+useEffect(() => {
+  if (!isTauriApp) return;
+  let cancelled = false;
+  const unlisteners: (() => void)[] = [];
+  const add = (p: Promise<() => void>) =>
+    p.then((fn) => (cancelled ? fn() : unlisteners.push(fn)));
+
+  // window hide ya normal reopen: hamesha fresh start
+  add(listen("app-hidden", () => setActiveContact(null)));
+  add(listen("app-reopened", () => setActiveContact(null)));
+
+
+  return () => {
+    cancelled = true;
+    unlisteners.forEach((fn) => fn());
+  };
+}, []);
   // 🔥 Load + realtime sync for group messages (jab active group chat khula ho)
   useEffect(() => {
     if (!activeContact || !(activeContact as any)?.isGroup) return;
@@ -6614,12 +6632,26 @@ useEffect(() => {
 
 const organized = (msgs || []).map((m: any) => {
   const isSystem = typeof m.content === "string" && m.content.startsWith("[SYSTEM]");
+  let parsedText = m.content;
+  let replyTo: any = null;
+  if (!isSystem && !m.is_deleted && typeof m.content === "string") {
+    try {
+      const parsed = JSON.parse(m.content);
+      if (parsed && typeof parsed === "object" && "text" in parsed) {
+        parsedText = parsed.text;
+        replyTo = parsed.replyTo || null;
+      }
+    } catch {
+      // JSON nahi hai (image/audio/plain text) - raw content hi rehne do
+    }
+  }
   return {
     id: m.id,
     senderId: m.sender_email,
     text: isSystem
       ? parseSystemMessage(m.content, user?.email)
-      : (m.is_deleted ? "message deleted" : m.content),
+      : (m.is_deleted ? "message deleted" : parsedText),
+    replyTo,
     timestamp: new Date(m.created_at).getTime(),
     time: formatMessageDateTime(m.created_at),
     isOwn: m.sender_email === user?.email,
@@ -6687,10 +6719,25 @@ const channel = supabase
       .eq("email", m.sender_email)
       .single();
 
+    let parsedText = m.content;
+    let replyTo: any = null;
+    if (!isSystemMsg && typeof m.content === "string") {
+      try {
+        const parsed = JSON.parse(m.content);
+        if (parsed && typeof parsed === "object" && "text" in parsed) {
+          parsedText = parsed.text;
+          replyTo = parsed.replyTo || null;
+        }
+      } catch {
+        // JSON nahi hai - raw content hi rehne do
+      }
+    }
+
 const newMsg = {
   id: m.id,
   senderId: m.sender_email,
-  text: isSystemMsg ? parseSystemMessage(m.content, user?.email) : m.content,
+  text: isSystemMsg ? parseSystemMessage(m.content, user?.email) : parsedText,
+      replyTo,
       timestamp: new Date(m.created_at).getTime(),
       time: formatMessageDateTime(m.created_at),
       isOwn: m.sender_email === user?.email,
@@ -7030,22 +7077,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
       // 🔥 unread count sirf dusre se aaye message pe badhao, apne khud ke message pe nahi
       // 🔥 unread count sirf dusre se aaye message pe badhao, apne khud ke message pe nahi
       if (!isOwnMessage) {
-        // 🔥 NOTIFICATION — sirf tab dikhao jab is contact ka chat abhi khula hua na ho (ref se latest state)
-        const currentActiveContact = activeContactRef.current;
-        const isChatOpen = currentActiveContact && getContactKey(currentActiveContact) === conversationKey;
-        const notificationsEnabled = preferences.notifications_enabled !== false; // 🔥 NAYA CHECK
-              if (!isChatOpen && notificationsEnabled) {
-          const senderProfile = friends.find(
-            (f) => f.id === conversationKey || f.email === conversationKey
-          );
-          const senderName = senderProfile?.name || "New message";
 
-          let notifBody = payload.text;
-          if (payload.text?.startsWith("[IMAGE]")) notifBody = "📷 Photo";
-          else if (payload.text?.startsWith("[AUDIO]")) notifBody = "🎤 Voice message";
-
-          showNotification(senderName, notifBody, conversationKey, false);
-        }
 
         setUnreadCounts((prev) => {
           const latestActiveContact = activeContactRef.current;
@@ -7087,14 +7119,14 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
     const syncInterval = setInterval(() => {
       console.log("[v0] 🔄 Periodic sync: requesting sent messages status");
       requestSentMessagesStatus();
-    }, 5000);
+    }, 30000);
 
     return () => clearInterval(syncInterval);
   }, [isConnected, requestSentMessagesStatus]);
 
   useEffect(() => {
     const unsubscribe = onPendingMessagesReceived?.((messages: any[]) => {
-      console.log("[v0] Pending messages received:", messages.length, messages);
+     
 
       if (!messages || messages.length === 0) return;
 
@@ -7136,7 +7168,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
           const conversationMessages = prev[conversationKey] || [];
           const exists = conversationMessages.some((m: any) => m.id === payload.id);
           if (exists) {
-            console.log(`[v0] Skipping duplicate message: ${payload.id}`);
+            
             alreadyExists = true;
             return prev;
           }
@@ -7181,7 +7213,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
   // 🔌 Listen for sent messages status (read receipts when sender comes back online)
   useEffect(() => {
     const unsubscribe = onSentMessagesStatusReceived?.((messages: any[]) => {
-      console.log("[v0] Sent messages status received:", messages.length, messages);
+  
 
       if (!messages || messages.length === 0) return;
 
@@ -7249,34 +7281,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
             return updated;
           });
 
-          // 🔥 NAYA: Local push notification bhejo (app open hone par bhi)
-          const notificationsEnabled = preferences.notifications_enabled !== false;
-          if (!notificationsEnabled) return;
-
-          try {
-            const { data: group } = await supabase
-              .from("groups")
-              .select("name")
-              .eq("id", groupId)
-              .single();
-
-            const { data: senderProfile } = await supabase
-              .from("profiles")
-              .select("name")
-              .eq("email", m.sender_email)
-              .single();
-
-            const groupName = group?.name || "Group";
-            const senderName = senderProfile?.name || m.sender_email;
-
-            let notifBody = m.content;
-            if (notifBody?.startsWith("[IMAGE]")) notifBody = "📷 Photo";
-            else if (notifBody?.startsWith("[AUDIO]")) notifBody = "🎤 Voice message";
-
-            showNotification(groupName, `${senderName}: ${notifBody}`, groupId, true);
-          } catch (err) {
-            console.error("Group notification failed:", err);
-          }
+          
         }
       )
       .subscribe();
@@ -7284,7 +7289,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.email, preferences.muted, preferences.notifications_enabled]);
+  }, [user?.email, preferences.muted]);
 
   // 🔌 Socket.IO: Listen for typing events
   useEffect(() => {
@@ -7736,7 +7741,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
   useEffect(() => {
     const interval = setInterval(() => {
       setTick((t) => t + 1);
-    }, 15000); // 🔥 every 15 sec refresh — memo lagne ke baad bhi input lag na ho isliye interval badhaya
+    }, 60000); 
 
     return () => clearInterval(interval);
   }, []);
@@ -7933,6 +7938,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
   useEffect(() => {
     handleSelectContactRef.current = handleSelectContact;
   });
+  useEffect(() => { friendsRef.current = friends; }, [friends]);
 
   // 🔥 Message action handlers
   // Delete for Me - completely remove message from view (only for this user)
@@ -8092,18 +8098,22 @@ const handleTyping = (typing: boolean) => {
   if (!activeContact) return;
   const contactKey = getContactKey(activeContact);
 
-  setLocalTyping((prev) => ({
-    ...prev,
-    [contactKey]: typing,
-  }));
+  setLocalTyping((prev) =>
+    prev[contactKey] === typing ? prev : { ...prev, [contactKey]: typing }
+  );
 
   const typingEnabled = preferences.typing_indicator !== false;
   const isGroup = (activeContact as any)?.isGroup;
 
-  if (isGroup) {
-    if (typingEnabled) sendGroupTyping(typing);
-  } else if (activeContact.id !== "self" && typingEnabled) {
-    sendTyping(contactKey, typing);
+  // typing=true ko har keystroke pe nahi, 1.5 sec mein ek baar bhejo
+  const now = Date.now();
+  if (!typing || now - lastTypingEmitRef.current > 1500) {
+    if (typing) lastTypingEmitRef.current = now;
+    if (isGroup) {
+      if (typingEnabled) sendGroupTyping(typing);
+    } else if (activeContact.id !== "self" && typingEnabled) {
+      sendTyping(contactKey, typing);
+    }
   }
 
   if (typingTimeoutRef.current) {
@@ -8113,10 +8123,9 @@ const handleTyping = (typing: boolean) => {
 
   if (typing) {
     typingTimeoutRef.current = setTimeout(() => {
-      setLocalTyping((prev) => ({
-        ...prev,
-        [contactKey]: false,
-      }));
+      setLocalTyping((prev) =>
+        prev[contactKey] === false ? prev : { ...prev, [contactKey]: false }
+      );
       if (isGroup) {
         if (typingEnabled) sendGroupTyping(false);
       } else if (activeContact.id !== "self" && typingEnabled) {
@@ -8141,10 +8150,21 @@ const sendGroupTyping = (isTyping: boolean) => {
 
     // 🔥 GROUP MESSAGE — alag path, socket wala normal flow skip
         if ((activeContact as any)?.isGroup) {
+      const groupPayload = {
+        text,
+        replyTo: replyToMsg
+          ? {
+              id: replyToMsg.id,
+              text: replyToMsg.isDeleted ? "message deleted" : replyToMsg.text,
+              senderName: replyToMsg.isOwn ? "You" : (replyToMsg as any).groupSenderName || activeContact.name,
+            }
+          : null,
+      };
+
       const { error } = await supabase.from("group_messages").insert({
         group_id: activeContact.id,
         sender_email: user?.email,
-        content: text,
+        content: JSON.stringify(groupPayload),
       });
       if (error) {
         console.error("Error sending group message:", error);
@@ -8254,16 +8274,18 @@ const sendGroupTyping = (isTyping: boolean) => {
   useEffect(() => {
     if (!activeContact) return;
 
-    const updated = friends.find(f => f.id === activeContact.id);
+    const updated = friends.find((f) => f.id === activeContact.id);
+    if (!updated) return;
 
-    if (updated) {
-      setActiveContact(prev => ({
-        ...prev,
-        ...updated,
-        // 🔥 last_seen null ko respect karo - overwrite mat karo
-        last_seen: updated.last_seen ?? null,
-      }));
-    }
+    setActiveContact((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...updated, last_seen: updated.last_seen ?? null };
+      return prev.name === next.name &&
+        prev.avatar === next.avatar &&
+        prev.last_seen === next.last_seen
+        ? prev
+        : next;
+    });
   }, [friends]);
 
 

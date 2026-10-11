@@ -63,8 +63,12 @@ const SplashScreen = ({ onDone }: Props) => {
       setState("checking");
 
       const isDev = import.meta.env.DEV;
+
+      // check() ko max 3 sec ka timeout do, warna slow network pe "checking" atka reh jaata hai
+      const timeout = new Promise<null>((res) => setTimeout(() => res(null), 3000));
+
       const [update] = await Promise.all([
-        isDev ? Promise.resolve(null) : check(),
+        isDev ? Promise.resolve(null) : Promise.race([check(), timeout]),
         new Promise((res) => setTimeout(res, 2500)),
       ]);
 

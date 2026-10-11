@@ -14,7 +14,7 @@ export function Toaster() {
               {description && <ToastDescription>{description}</ToastDescription>}
             </div>
             {action}
-            <ToastClose />
+            {/* <ToastClose />  👈 ye line hata di */}
           </Toast>
         );
       })}

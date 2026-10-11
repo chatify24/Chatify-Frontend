@@ -1,7 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Reply, Forward, Pin, Trash2, Users, Copy, Check, Edit3Icon,Send } from "lucide-react";
+import {
+  Reply,
+  Forward,
+  Pin,
+  Trash2,
+  Users,
+  Copy,
+  Check,
+  Edit3Icon,
+  Download
+} from "lucide-react";
 
 interface MessageContextMenuProps {
   isOpen: boolean;
@@ -18,6 +28,8 @@ interface MessageContextMenuProps {
   isOwn: boolean;
   isPinned: boolean;
   isSelfChat: boolean;
+  isImage?: boolean;
+  onDownloadImage?: () => void;
 }
 
 export function MessageContextMenu({
@@ -34,7 +46,9 @@ export function MessageContextMenu({
   onEdit,
   isOwn,
   isPinned,
-  isSelfChat, 
+  isSelfChat,
+   isImage = false,
+  onDownloadImage, 
 }: MessageContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [adjustedPosition, setAdjustedPosition] = useState(position);
@@ -91,74 +105,92 @@ export function MessageContextMenu({
     setTimeout(() => setCopied(false), 1200);
   };
 
- const menuItems = [
-    {
-      label: copied ? "Copied!" : "Copy",
-      icon: copied ? Check : Copy,
-      action: handleCopy,
-      show: true,
-    },
-    {
-      label: "Select",
-      icon: Check,
-      action: onSelect,
-      show: true,
-    },
-    {
-      label: "Edit",
-      icon: Edit3Icon,
-      action: onEdit,
-      show: isOwn,
-    },
-    {
-  label: "Forward",
-  icon: Forward,  // 🔥 Send icon
-  action: onForward,
-  show: isSelfChat,
-},
-    {
-      label: "Reply",
-      icon: Reply,
-      action: onReply,
-      show: !isSelfChat,  // 🔥 self chat mein hide
-    },
-    {
-      label: "Forward",
-      icon: Forward,
-      action: onForward,
-      show: !isSelfChat,  // 🔥 self chat mein hide
-    },
-    {
-      label: isPinned ? "Unpin" : "Pin",
-      icon: Pin,
-      action: onPin,
-      show: true,
-    },
-    // 🔥 Self chat: simple Delete
-    {
-      label: "Delete",
-      icon: Trash2,
-      action: onDeleteForMe,
-      show: isSelfChat,
-      className: "text-destructive",
-    },
-    // 🔥 Normal chat: Delete for Me
-    {
-      label: "Delete for Me",
-      icon: Trash2,
-      action: onDeleteForMe,
-      show: !isSelfChat,
-      className: "text-destructive",
-    },
-    // 🔥 Normal chat: Delete for Everyone (sirf apne messages pe)
-    {
-      label: "Delete for Everyone",
-      icon: Users,
-      action: onDeleteForEveryone,
-      show: !isSelfChat && isOwn,
-      className: "text-destructive",
-    },
-  ];
+const menuItems = [
+  // IMAGE ONLY
+  
+
+  {
+    label: "Download",
+    icon: Download,
+    action: () => onDownloadImage?.(),
+    show: isImage,
+  },
+
+  // NORMAL COPY
+  {
+    label: copied ? "Copied!" : "Copy",
+    icon: copied ? Check : Copy,
+    action: handleCopy,
+    show: !isImage,
+  },
+
+  {
+    label: "Select",
+    icon: Check,
+    action: onSelect,
+    show: true,
+  },
+
+  // 🔥 IMAGE PAR EDIT HIDE
+  {
+    label: "Edit",
+    icon: Edit3Icon,
+    action: onEdit,
+    show: isOwn && !isImage,
+  },
+
+  {
+    label: "Forward",
+    icon: Forward,
+    action: onForward,
+    show: isSelfChat,
+  },
+
+  {
+    label: "Reply",
+    icon: Reply,
+    action: onReply,
+    show: !isSelfChat,
+  },
+
+  {
+    label: "Forward",
+    icon: Forward,
+    action: onForward,
+    show: !isSelfChat,
+  },
+
+  {
+    label: isPinned ? "Unpin" : "Pin",
+    icon: Pin,
+    action: onPin,
+    show: true,
+  },
+
+  {
+    label: "Delete",
+    icon: Trash2,
+    action: onDeleteForMe,
+    show: isSelfChat,
+    className: "text-destructive",
+  },
+
+  {
+    label: "Delete for Me",
+    icon: Trash2,
+    action: onDeleteForMe,
+    show: !isSelfChat,
+    className: "text-destructive",
+  },
+
+  {
+    label: "Delete for Everyone",
+    icon: Users,
+    action: onDeleteForEveryone,
+    show: !isSelfChat && isOwn,
+    className: "text-destructive",
+  },
+];
 
   return (
     <div
