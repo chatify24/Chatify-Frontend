@@ -217,7 +217,7 @@ export default function Welcome() {
     setTimeout(() => {
       const link = document.createElement('a');
       link.href =
-        'https://github.com/chatify24/Chatify/releases/download/v2.9.29/Chatify_2.9.29_x64-setup.exe';
+        'https://github.com/chatify24/Chatify/releases/download/v2.9.30/Chatify_2.9.30_x64-setup.exe';
       link.download = 'Chatify.exe';
       document.body.appendChild(link);
       link.click();
@@ -232,7 +232,7 @@ export default function Welcome() {
     setTimeout(() => {
       const link = document.createElement('a');
       link.href =
-        'https://github.com/chatify24/chatify_android/releases/download/v2.9.29/Chatify.apk';
+        'https://github.com/chatify24/chatify_android/releases/download/v2.9.30/Chatify.apk';
       link.download = 'Chatify.apk';
       document.body.appendChild(link);
       link.click();

@@ -1865,10 +1865,15 @@ useEffect(() => {
 
   const getSortTime = (contactId: string) => {
     const friend = acceptedFriends.find(f => f.id === contactId);
-    const key = (friend?.email || contactId || "").toLowerCase().trim();
-    const time = contactOrder[key] || 0;
-    
-    return time;
+    const rawKey = friend?.email || contactId || "";
+    const key = rawKey.toLowerCase().trim();
+    const fromOrder = contactOrder[key] || contactOrder[rawKey] || 0;
+
+    // 1-to-1 chats: last message ka time seedha loaded messages se (koi extra call nahi)
+    const msgs = allMessages[rawKey] || allMessages[key];
+    const lastMsgTime = msgs && msgs.length ? (msgs[msgs.length - 1].timestamp || 0) : 0;
+
+    return Math.max(fromOrder, lastMsgTime);
   };
 
   const baseContacts = [
@@ -6441,34 +6446,35 @@ useEffect(() => {
   if (!user?.email) return;
 
   const loadContactOrder = async () => {
+    const lsKey = `contact_order_${user.email}`;
+    let local: Record<string, number> = {};
+    try {
+      const saved = localStorage.getItem(lsKey);
+      if (saved) local = JSON.parse(saved);
+    } catch {}
+
+    let remote: Record<string, number> = {};
     try {
       const { data, error } = await supabase
         .from("user_preferences")
         .select("contact_order")
         .eq("user_id", user.email)
         .single();
-
-      if (!error && data?.contact_order && Object.keys(data.contact_order).length > 0) {
-        setContactOrder((prev) => {
-  const merged = { ...data.contact_order, ...prev };
-  localStorage.setItem(`contact_order_${user.email}`, JSON.stringify(merged));
-  return merged;
-});
-        localStorage.setItem(`contact_order_${user.email}`, JSON.stringify(data.contact_order));
-        setContactOrderLoaded(true);
-        return;
-      }
+      if (!error && data?.contact_order) remote = data.contact_order;
     } catch (e) {
       console.error("Failed to load contact_order from DB:", e);
     }
 
-    // 🔥 fallback - agar DB mein kuch na mile
-    try {
-      const saved = localStorage.getItem(`contact_order_${user.email}`);
-      if (saved) setContactOrder(JSON.parse(saved));
-    } catch (e) {
-      console.error("Failed to restore contact order from localStorage:", e);
-    }
+    setContactOrder((prev) => {
+      const merged: Record<string, number> = { ...remote };
+      [local, prev].forEach((src) => {
+        Object.keys(src).forEach((k) => {
+          if ((src[k] || 0) > (merged[k] || 0)) merged[k] = src[k];
+        });
+      });
+      localStorage.setItem(lsKey, JSON.stringify(merged));
+      return merged;
+    });
     setContactOrderLoaded(true);
   };
 
@@ -6523,11 +6529,17 @@ useEffect(() => {
     .on(
       "postgres_changes",
       { event: "UPDATE", schema: "public", table: "user_preferences", filter: `user_id=eq.${user.email}` },
-      (payload: any) => {
-        if (payload.new?.contact_order) {
-          setContactOrder(payload.new.contact_order);
-          localStorage.setItem(`contact_order_${user.email}`, JSON.stringify(payload.new.contact_order));
-        }
+          (payload: any) => {
+        const incoming = payload.new?.contact_order;
+        if (!incoming) return;
+        setContactOrder((prev) => {
+          const merged: Record<string, number> = { ...incoming };
+          Object.keys(prev).forEach((k) => {
+            if ((prev[k] || 0) > (merged[k] || 0)) merged[k] = prev[k];
+          });
+          localStorage.setItem(`contact_order_${user.email}`, JSON.stringify(merged));
+          return merged;
+        });
       }
     )
     .subscribe();
