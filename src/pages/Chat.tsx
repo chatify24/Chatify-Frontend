@@ -1527,7 +1527,10 @@ const fetchGroups = async () => {
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
-  setUserGroups(groupsList);
+  setUserGroups((prev) => {
+  const key = (l: any[]) => l.map((g) => `${g.id}|${g.name}|${g.avatar}|${g.bio}`).join(",");
+  return key(prev) === key(groupsList) ? prev : groupsList;
+});
 
   // 🔥 FIXED: ab stale contactOrder pe depend nahi karta
   groupsList.forEach((g: any) => {
@@ -1609,30 +1612,32 @@ useEffect(() => {
 useEffect(() => {
   if (!userEmail || userGroups.length === 0) return;
 
-  const loadInitialGroupUnread = async () => {
-    for (const g of userGroups) {
-      const { data: allMsgs } = await supabase
-        .from("group_messages")
-        .select("id, sender_email, content")
-        .eq("group_id", g.id);
+const loadInitialGroupUnread = async () => {
+  const ids = userGroups.map((g) => g.id);
+  if (ids.length === 0) return;
 
-      const { data: readRows } = await supabase
-        .from("group_message_reads")
-        .select("message_id")
-        .eq("group_id", g.id)
-        .eq("reader_email", userEmail);
+  const { data: allMsgs } = await supabase
+    .from("group_messages")
+    .select("id, group_id")
+    .in("group_id", ids)
+    .neq("sender_email", userEmail)
+    .not("content", "like", "[SYSTEM]%");
 
-      const readIds = new Set((readRows || []).map((r: any) => r.message_id));
+  const { data: readRows } = await supabase
+    .from("group_message_reads")
+    .select("message_id")
+    .in("group_id", ids)
+    .eq("reader_email", userEmail);
 
-      const unread = (allMsgs || []).filter((m: any) =>
-        m.sender_email !== userEmail &&
-        !readIds.has(m.id) &&
-        !(typeof m.content === "string" && m.content.startsWith("[SYSTEM]"))
-      ).length;
+  const readIds = new Set((readRows || []).map((r: any) => r.message_id));
+  const counts: Record<string, number> = {};
+  ids.forEach((id) => (counts[id] = 0));
+  (allMsgs || []).forEach((m: any) => {
+    if (!readIds.has(m.id)) counts[m.group_id]++;
+  });
 
-      setUnreadCounts((prev) => ({ ...prev, [g.id]: unread }));
-    }
-  };
+  setUnreadCounts((prev) => ({ ...prev, ...counts }));
+};
 
   loadInitialGroupUnread();
 }, [userGroups, userEmail]);
@@ -4735,11 +4740,11 @@ if (!contact) {
                       src={msg.text.replace("[IMAGE]", "").replace("[/IMAGE]", "")}
                       alt="Sent image"
                       className="max-w-[240px] max-h-[240px] rounded-xl object-cover cursor-pointer"
-                      onClick={() => {
-                        const url = msg.text.replace("[IMAGE]", "").replace("[/IMAGE]", "");
-                        setPreviewImage(url);
-                        setPreviewTitle("Image");
-                      }}
+onClick={() => {
+  const url = msg.text.replace("[IMAGE]", "").replace("[/IMAGE]", "");
+  setPreviewImage(url);
+  setPreviewTitle("__CHAT_IMAGE__");
+}}
                     />
                   ) : msg.text?.startsWith("[AUDIO]") ? (
                     <audio
@@ -6290,6 +6295,21 @@ onDownloadImage={async () => {
  </div>
   );
 });
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+const persistMessages = (key: string, data: Record<string, Message[]>) => {
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    try {
+      const slim: Record<string, any[]> = {};
+      for (const k in data) {
+        slim[k] = (data[k] || [])
+          .filter((m) => !m.text?.startsWith("[AUDIO]data:")) // base64 audio cache mat karo
+          .slice(-200);                                        // last 200 hi
+      }
+      localStorage.setItem(key, JSON.stringify(slim));
+    } catch {}
+  }, 800);
+};
 const isTauriApp =
   typeof window !== "undefined" &&
   "__TAURI_INTERNALS__" in window;
@@ -7025,7 +7045,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
                 : msg
             ) || [],
           };
-          localStorage.setItem(msgKey, JSON.stringify(updated));
+          persistMessages(msgKey, updated)
           return updated;
         });
         return;
@@ -7081,7 +7101,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
           };
         }
 
-        localStorage.setItem(msgKey, JSON.stringify(updated));
+        persistMessages(msgKey, updated)
         return updated;
       });
      updateContactOrder(conversationKey, payload.timestamp);
@@ -7188,7 +7208,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
             ...prev,
             [conversationKey]: [...conversationMessages, payload],
           };
-          localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
+          persistMessages(msgKey, updated)
           return updated;
         });
 
@@ -7253,7 +7273,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
               return m;
             }),
           };
-          localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
+          persistMessages(msgKey, updated)
           return updated;
         });
       });
@@ -7437,7 +7457,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
           console.log(`❌ Message ${data.messageId} NOT FOUND in any conversation`);
         }
 
-        localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
+        persistMessages(msgKey, updated)
         return updated;
       });
     });
@@ -7468,7 +7488,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
         }
 
         if (found) {
-          localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
+          persistMessages(msgKey, updated)
         }
 
         return found ? updated : prev;
@@ -7503,7 +7523,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
         }
 
         if (messageFound) {
-          localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
+          persistMessages(msgKey, updated)
         }
 
         return updated;
@@ -7578,7 +7598,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
         }
 
         console.log(`[v0] 📊 Updated ${updatedCount} messages in conversation ${conversationKey}`);
-        localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
+        persistMessages(msgKey, updated)
         return updated;
       });
     });
@@ -7612,11 +7632,15 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
       const unreadKey = `chat_unread_counts_${user.email}`;
 
       try {
-        const { data: msgs, error } = await supabase
+        // 🔥 Latest 1000 messages hi lao (DESC + limit), phir reverse karke oldest→newest bana do
+        const { data: msgsDesc, error } = await supabase
           .from("messages")
           .select("*")
           .or(`sender_email.eq.${user.email},receiver_email.eq.${user.email}`)
-          .order("created_at", { ascending: true });
+          .order("created_at", { ascending: false })
+          .limit(1000);
+
+        const msgs = msgsDesc ? [...msgsDesc].reverse() : msgsDesc;
 
         if (error) {
           console.error("Failed to fetch messages from DB:", error);
@@ -7683,7 +7707,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
           });
 
           setAllMessages(organized);
-          localStorage.setItem(msgKey, JSON.stringify(organized));
+          persistMessages(msgKey, organized); // 🔥 debounced + slim cache
           console.log("✅ Messages loaded from Supabase DB");
         } else {
           console.log("📭 No messages found in DB");
@@ -7802,7 +7826,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
                 ? { ...msg, status: "read" as const, readAt: readTimestamp }
                 : msg
             ) || [];
-            localStorage.setItem(msgKey, JSON.stringify(updated));
+            persistMessages(msgKey, updated)
             return updated;
           });
 
@@ -7883,7 +7907,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
         ...prev,
         [contactKey]: [...(prev[contactKey] || []), newMsg],
       };
-      localStorage.setItem(msgKey, JSON.stringify(updated));
+      persistMessages(msgKey, updated)
       return updated;
     });
     updateContactOrder(contactKey, newMsg.timestamp);
@@ -7931,7 +7955,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
     if (!allMessages[contactKey]) {
       setAllMessages((prev) => {
         const updated = { ...prev, [contactKey]: [] };
-        localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
+        persistMessages(msgKey, updated)
         return updated;
       });
     }
@@ -7987,7 +8011,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
         ...prev,
         [contactKey]: prev[contactKey]?.filter((msg) => msg.id !== messageId) || [],
       };
-      localStorage.setItem(msgKey, JSON.stringify(updated));
+      persistMessages(msgKey, updated)
       return updated;
     });
 
@@ -8017,7 +8041,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
             : msg
         ) || [],
       };
-      localStorage.setItem(msgKey, JSON.stringify(updated));
+      persistMessages(msgKey, updated)
       return updated;
     });
 
@@ -8094,7 +8118,7 @@ const setContactOrderIfMissing = (contactKey, timestamp) => {
 
     setAllMessages((prev) => {
       const updated = { ...prev, [contactKey]: [] };
-      localStorage.setItem(msgKey, JSON.stringify(updated)); // 🔥
+      persistMessages(msgKey, updated)
       return updated;
     });
 
@@ -8224,7 +8248,7 @@ const sendGroupTyping = (isTyping: boolean) => {
         ...prev,
         [contactKey]: [...(prev[contactKey] || []), newMsg],
       };
-      localStorage.setItem(msgKey, JSON.stringify(updated));
+      persistMessages(msgKey, updated)
       return updated;
     });
     updateContactOrder(contactKey, newMsg.timestamp);
@@ -8446,7 +8470,7 @@ if (isLoading) {
                   m.id === clientId ? { ...m, text: audioUrl } : m
                 ),
               };
-              localStorage.setItem(msgKey, JSON.stringify(updated));
+              persistMessages(msgKey, updated)
               return updated;
             });
 
@@ -8464,40 +8488,73 @@ if (isLoading) {
         logout={logout}
       />
 
-      {previewTitle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
-          <div className="relative w-full max-w-xl rounded-3xl bg-card p-6 shadow-2xl border border-border">
-            <button
-              type="button"
-              onClick={() => {
-                setPreviewImage(null);
-                setPreviewTitle(null);
-              }}
-              className="absolute right-4 top-4 group rounded-md p-1.5 transition-colors hover:bg-red-500"
-              aria-label="Close profile preview"
-            >
-              <X className="h-5 w-5 text-muted-foreground group-hover:text-white transition-colors" />
-            </button>
-            <div className="flex flex-col items-center gap-4">
-              {previewImage ? (
-                <img
-                  src={previewImage}
-                  alt={previewTitle || "Profile preview"}
-                  className="h-64 w-64 rounded-full object-cover border border-border"
-                />
-              ) : (
-                <div className="flex h-64 w-64 items-center justify-center rounded-full bg-muted text-5xl font-bold text-muted-foreground">
-                  {previewTitle?.slice(0, 1).toUpperCase()}
-                </div>
-              )}
-              <div className="text-center">
-                <h2 className="text-2xl font-semibold">{previewTitle}</h2>
-                <p className="text-sm text-muted-foreground">Profile preview</p>
-              </div>
+{previewTitle && (
+  previewTitle === "__CHAT_IMAGE__" ? (
+    // 🖼️ Normal chat image viewer (full image, no circle)
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 py-6"
+      onClick={() => {
+        setPreviewImage(null);
+        setPreviewTitle(null);
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => {
+          setPreviewImage(null);
+          setPreviewTitle(null);
+        }}
+        className="absolute right-4 top-4 group rounded-md p-1.5 transition-colors hover:bg-red-500"
+        aria-label="Close image preview"
+        style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+      >
+        <X className="h-6 w-6 text-white" />
+      </button>
+      {previewImage && (
+        <img
+          src={previewImage}
+          alt="Image"
+          onClick={(e) => e.stopPropagation()}
+          className="max-h-[90vh] max-w-[95vw] rounded-lg object-contain"
+        />
+      )}
+    </div>
+  ) : (
+    // 👤 Profile preview (same as before)
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+      <div className="relative w-full max-w-xl rounded-3xl bg-card p-6 shadow-2xl border border-border">
+        <button
+          type="button"
+          onClick={() => {
+            setPreviewImage(null);
+            setPreviewTitle(null);
+          }}
+          className="absolute right-4 top-4 group rounded-md p-1.5 transition-colors hover:bg-red-500"
+          aria-label="Close profile preview"
+        >
+          <X className="h-5 w-5 text-muted-foreground group-hover:text-white transition-colors" />
+        </button>
+        <div className="flex flex-col items-center gap-4">
+          {previewImage ? (
+            <img
+              src={previewImage}
+              alt={previewTitle || "Profile preview"}
+              className="h-64 w-64 rounded-full object-cover border border-border"
+            />
+          ) : (
+            <div className="flex h-64 w-64 items-center justify-center rounded-full bg-muted text-5xl font-bold text-muted-foreground">
+              {previewTitle?.slice(0, 1).toUpperCase()}
             </div>
+          )}
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold">{previewTitle}</h2>
+            <p className="text-sm text-muted-foreground">Profile preview</p>
           </div>
         </div>
-      )}
+      </div>
+    </div>
+  )
+)}
 
     </div>
   );
